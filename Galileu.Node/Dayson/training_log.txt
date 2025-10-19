@@ -1,0 +1,17 @@
+
+Época 1/100 concluída. Perda média: 5,870504599791294 : Concluída em 00:11:57
+[Época 1] Perda Média de Validação: 5,4080
+Época 2/100 concluída. Perda média: 5,442277270636692 : Concluída em 00:11:46
+[Época 2] Perda Média de Validação: 5,9545
+Época 1/100 concluída. Perda média: 5,876591656603061 : Concluída em 00:11:48
+[Época 1] Perda Média de Validação: 5,4295
+Época 2/100 concluída. Perda média: 5,4196501793826855 : Concluída em 00:11:49
+[Época 2] Perda Média de Validação: 5,8796
+Época 1/100 concluída. Perda média: 9,801888220670415 : Concluída em 00:11:42
+[Época 1] Perda Média de Validação: 9,6825
+Época 1/100 concluída. Perda média: 9,80202158940591 : Concluída em 00:12:02
+[Época 1] Perda Média de Validação: 9,6961
+Época 2/100 concluída. Perda média: 9,40274718496918 : Concluída em 00:11:46
+[Época 2] Perda Média de Validação: 9,1079
+Época 3/100 concluída. Perda média: 8,881752213391602 : Concluída em 00:11:43
+[Época 3] Perda Média de Validação: 8,7164

@@ -1,0 +1,712 @@
+using Galileu.Node.Interfaces;
+using OpenCL.NetCore;
+using static OpenCL.NetCore.Cl;
+using Exception = System.Exception;
+using System.IO;
+using System.Runtime.InteropServices;
+using Environment = System.Environment;
+
+namespace Galileu.Node.Gpu;
+
+public class GpuMathEngine : IMathEngine
+{
+    // ... (todo o código anterior permanece o mesmo até LoadKernel) ...
+    public bool IsGpu => true;
+    private readonly Context _context;
+    private readonly CommandQueue _commandQueue;
+    private readonly Device _device;
+    private readonly string _kernelCacheDirectory;
+    private bool _disposed = false;
+
+    private static readonly Dictionary<string, string> KernelSources = new Dictionary<string, string>
+    {
+        // ... (kernels omitidos) ...
+        {
+            "matrix_multiply", @"
+            __kernel void matrix_multiply(__global const float* A, __global const float* B, __global float* C, int M, int N, int P) { 
+                int i = get_global_id(0); int j = get_global_id(1); 
+                if (i < M && j < P) { 
+                    float sum = 0.0f; 
+                    for (int k = 0; k < N; ++k) { sum += A[i * N + k] * B[k * P + j]; } 
+                    C[i * P + j] = sum; 
+                } 
+            }"
+        },
+        {
+            "vector_matrix_multiply", @"
+            __kernel void vector_matrix_multiply(__global const float* V, __global const float* M, __global float* R, int B, int N, int P) {
+                int i = get_global_id(0); // Batch index
+                int j = get_global_id(1); // Column index in M / Position in R
+                if (i < B && j < P) {
+                    float sum = 0.0f;
+                    for (int k = 0; k < N; ++k) {
+                        sum += V[i * N + k] * M[k * P + j];
+                    }
+                    R[i * P + j] = sum;
+                }
+            }"
+        },
+        {
+            "add", @"
+            __kernel void add(__global const float* a, __global const float* b, __global float* result) { int gid = get_global_id(0); result[gid] = a[gid] + b[gid]; }"
+        },
+        {
+            "add_broadcast", @"
+            __kernel void add_broadcast(__global float* a, __global const float* bias, int bias_size) { int gid = get_global_id(0); a[gid] += bias[gid % bias_size]; }"
+        },
+        {
+            "multiply", @"
+            __kernel void multiply(__global const float* a, __global const float* b, __global float* result) { int gid = get_global_id(0); result[gid] = a[gid] * b[gid]; }"
+        },
+        {
+            "sigmoid", @"
+            __kernel void sigmoid(__global const float* a, __global float* result) { int gid = get_global_id(0); result[gid] = 1.0f / (1.0f + exp(-a[gid])); }"
+        },
+        {
+            "tanh_activation", @"
+            __kernel void tanh_activation(__global const float* a, __global float* result) { int gid = get_global_id(0); result[gid] = tanh(a[gid]); }"
+        },
+        {
+            "clone_buffer", @"
+            __kernel void clone_buffer(__global const float* input, __global float* output) { int gid = get_global_id(0); output[gid] = input[gid]; }"
+        },
+        {
+            "transpose", @"
+            __kernel void transpose(__global const float* input, __global float* output, int rows, int cols) { int i = get_global_id(0); int j = get_global_id(1); if (i < rows && j < cols) { output[j * rows + i] = input[i * cols + j]; } }"
+        },
+        {
+            "subtract", @"
+            __kernel void subtract(__global const float* a, __global const float* b, __global float* result) { int gid = get_global_id(0); result[gid] = a[gid] - b[gid]; }"
+        },
+        {
+            "sigmoid_derivative", @"
+            __kernel void sigmoid_derivative(__global const float* output, __global float* result) { int gid = get_global_id(0); float o = output[gid]; result[gid] = o * (1.0f - o); }"
+        },
+        {
+            "tanh_derivative", @"
+            __kernel void tanh_derivative(__global const float* output, __global float* result) { int gid = get_global_id(0); float o = output[gid]; result[gid] = 1.0f - o * o; }"
+        },
+        {
+            "matrix_multiply_transpose_a", @"
+            __kernel void matrix_multiply_transpose_a(__global const float* A, __global const float* B, __global float* C, int M, int K, int P) { int i = get_global_id(0); int j = get_global_id(1); if (i < M && j < P) { float sum = 0.0f; for (int k = 0; k < K; ++k) { sum += A[k * M + i] * B[k * P + j]; } C[i * P + j] = sum; } }"
+        },
+        {
+            "matrix_multiply_transpose_b", @"
+            __kernel void matrix_multiply_transpose_b(__global const float* A, __global const float* B, __global float* C, int M, int K, int P) { int i = get_global_id(0); int j = get_global_id(1); if (i < M && j < P) { float sum = 0.0f; for (int k = 0; k < K; ++k) { sum += A[i * K + k] * B[j * K + k]; } C[i * P + j] = sum; } }"
+        },
+        {
+            "add_scaled", @"
+            __kernel void add_scaled(__global float* target, __global const float* source, float scalar) { int gid = get_global_id(0); target[gid] += source[gid] * scalar; }"
+        },
+        {
+            "subtract_scaled", @"
+            __kernel void subtract_scaled(__global float* target, __global const float* source, float scalar) { int gid = get_global_id(0); target[gid] -= source[gid] * scalar; }"
+        },
+        {
+            "slice", @"
+            __kernel void slice(__global const float* source, __global float* dest, int offset, int size) { int gid = get_global_id(0); if (gid < size) { dest[gid] = source[offset + gid]; } }"
+        },
+        {
+            "set", @"
+            __kernel void set(__global float* dest, __global const float* source, int offset, int size) { int gid = get_global_id(0); if (gid < size) { dest[offset + gid] = source[gid]; } }"
+        },
+        {
+            "clip", @"
+            __kernel void clip(__global float* data, float min_val, float max_val) { int gid = get_global_id(0); data[gid] = fmax(min_val, fmin(max_val, data[gid])); }"
+        },
+        {
+            "scale", @"
+            __kernel void scale(__global float* data, float scalar) { int gid = get_global_id(0); data[gid] *= scalar; }"
+        },
+        {
+            "softmax", @"
+            __kernel void softmax(__global const float* input, __global float* output, int size) {
+                int row = get_global_id(0);
+                int offset = row * size;
+                float maxVal = input[offset];
+                for (int i = 1; i < size; i++) { if (input[offset + i] > maxVal) maxVal = input[offset + i]; }
+                float sumExp = 0.0f;
+                for (int i = 0; i < size; i++) { output[offset + i] = exp(input[offset + i] - maxVal); sumExp += output[offset + i]; }
+                for (int i = 0; i < size; i++) { output[offset + i] /= sumExp; }
+            }"
+        },
+        {
+            "lookup", @"
+            __kernel void lookup(__global const float* embedding_matrix, __global float* result, int index, int embedding_size) {
+                int gid = get_global_id(0);
+                if (gid < embedding_size) { result[gid] = embedding_matrix[index * embedding_size + gid]; }
+            }"
+        },
+        {
+            "accumulate_gradient_no_atomic", @"
+            __kernel void accumulate_gradient_no_atomic(__global float* embedding_gradients, __global const float* gradient, int index, int embedding_size) {
+                int gid = get_global_id(0);
+                if (gid < embedding_size) { embedding_gradients[index * embedding_size + gid] += gradient[gid]; }
+            }"
+        },
+        {
+            "one_hot_encode", @"
+            __kernel void one_hot_encode(__global float* output, __global const int* indices, int total_classes) {
+                int i = get_global_id(0); // i representa o índice na sequência (batch)
+                
+                // Primeiro, zera toda a linha para esta amostra
+                int row_offset = i * total_classes;
+                for(int j = 0; j < total_classes; ++j) {
+                    output[row_offset + j] = 0.0f;
+                }
+                
+                // Agora, define o valor 1.0 na posição correta
+                int one_hot_index = indices[i];
+                output[row_offset + one_hot_index] = 1.0f;
+            }"
+        },
+        {
+            "adam_update", @"
+            __kernel void adam_update(
+                __global float* p, __global const float* g, __global float* m, __global float* v,
+                float lr, float beta1, float beta2, float epsilon, int t)
+            {
+                int i = get_global_id(0);
+                
+                // Atualiza momentos
+                m[i] = beta1 * m[i] + (1.0f - beta1) * g[i];
+                v[i] = beta2 * v[i] + (1.0f - beta2) * (g[i] * g[i]);
+                
+                // Corrige viés
+                float m_hat = m[i] / (1.0f - pow(beta1, t));
+                float v_hat = v[i] / (1.0f - pow(beta2, t));
+                
+                // Atualiza parâmetro
+                p[i] -= lr * m_hat / (sqrt(v_hat) + epsilon);
+            }"
+        }
+    };
+
+    public GpuMathEngine()
+    {
+        ErrorCode error;
+        Platform[] platforms = GetPlatformIDs(out error);
+        CheckError(error);
+        var platform = platforms.First();
+        Device[] devices = GetDeviceIDs(platform, DeviceType.Gpu, out error);
+        if (error != ErrorCode.Success || devices.Length == 0)
+        {
+            devices = GetDeviceIDs(platform, DeviceType.Cpu, out error);
+            CheckError(error);
+        }
+
+        _device = devices[0];
+        Console.WriteLine($"[OpenCL] Usando dispositivo: {GetDeviceInfo(_device, DeviceInfo.Name, out error)}");
+        _context = CreateContext(null, 1, new[] { _device }, null, IntPtr.Zero, out error);
+        CheckError(error);
+        _commandQueue = CreateCommandQueue(_context, _device, CommandQueueProperties.None, out error);
+        CheckError(error);
+
+        // ✅ MODIFICAÇÃO: Define o diretório de cache e garante que ele exista.
+        _kernelCacheDirectory = Path.Combine(Environment.CurrentDirectory, "Dayson", "kernels");
+        Directory.CreateDirectory(_kernelCacheDirectory);
+
+        CompileAndSaveKernels();
+    }
+
+    private void CompileAndSaveKernels()
+    {
+        foreach (var kvp in KernelSources)
+        {
+            string kernelName = kvp.Key;
+            string source = kvp.Value;
+
+            // ✅ MODIFICAÇÃO: Usa o diretório de cache para construir o caminho.
+            string path = Path.Combine(_kernelCacheDirectory, kernelName + ".bin");
+
+            if (File.Exists(path)) continue;
+
+            ErrorCode error;
+            OpenCL.NetCore.Program program = CreateProgramWithSource(_context, 1, new[] { source }, null, out error);
+            CheckError(error);
+
+            error = BuildProgram(program, 1, new[] { _device }, string.Empty, null, IntPtr.Zero);
+            if (error != ErrorCode.Success)
+            {
+                var log = GetProgramBuildInfo(program, _device, ProgramBuildInfo.Log, out error).ToString();
+                throw new Exception($"Build failed for {kernelName}: {log}");
+            }
+
+            var binarySizeBuffer = new InfoBuffer(IntPtr.Size);
+            error = GetProgramInfo(program, ProgramInfo.BinarySizes, IntPtr.Size, binarySizeBuffer, out _);
+            CheckError(error);
+
+            IntPtr binarySize = binarySizeBuffer.CastTo<IntPtr>();
+            var binaryBuffer = new InfoBuffer(binarySize);
+            var binariesArray = new InfoBufferArray(new[] { binaryBuffer });
+            error = GetProgramInfo(program, ProgramInfo.Binaries, binariesArray.Size, binariesArray, out _);
+            CheckError(error);
+
+            byte[] binary = binaryBuffer.CastToArray<byte>(binarySize.ToInt32());
+
+            File.WriteAllBytes(path, binary);
+            ReleaseProgram(program);
+        }
+    }
+
+    private Kernel LoadKernel(string kernelName, out OpenCL.NetCore.Program programOut)
+    {
+        string path = Path.Combine(_kernelCacheDirectory, kernelName + ".bin");
+        ErrorCode error;
+
+        if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(OSPlatform.Linux) || !File.Exists(path))
+        {
+            // No Linux ou se o binário não existir, recompilar a partir do código-fonte
+            if (!KernelSources.TryGetValue(kernelName, out string source))
+            {
+                throw new Exception($"Código-fonte do kernel {kernelName} não encontrado.");
+            }
+
+            OpenCL.NetCore.Program program = CreateProgramWithSource(_context, 1, new[] { source }, null, out error);
+            CheckError(error, $"Falha ao criar programa com código-fonte para {kernelName}");
+
+            error = BuildProgram(program, 1, new[] { _device }, string.Empty, null, IntPtr.Zero);
+            if (error != ErrorCode.Success)
+            {
+                var log = GetProgramBuildInfo(program, _device, ProgramBuildInfo.Log, out error).ToString();
+                throw new Exception($"Falha na compilação do kernel {kernelName}: {log}");
+            }
+
+            Kernel kernel = CreateKernel(program, kernelName, out error);
+            CheckError(error, $"Falha ao criar kernel {kernelName}");
+
+            programOut = program;
+            return kernel;
+        }
+        else
+        {
+            // Código original para outras plataformas
+            byte[] binaryData = File.ReadAllBytes(path);
+            var binaryBuffer = new InfoBuffer(binaryData);
+            var binaries = new InfoBufferArray(new[] { binaryBuffer });
+            var lengths = new[] { (IntPtr)binaryData.Length };
+            var binaryStatus = new InfoBufferArray<ErrorCode>(1);
+
+            OpenCL.NetCore.Program program = CreateProgramWithBinary(_context, 1, new[] { _device }, lengths, binaries,
+                binaryStatus, out error);
+            CheckError(error, "Falha ao criar programa com binário");
+
+            if (binaryStatus[0] != ErrorCode.Success)
+            {
+                throw new Exception($"CreateProgramWithBinary falhou com status {binaryStatus[0]}");
+            }
+
+            error = BuildProgram(program, 1, new[] { _device }, string.Empty, null, IntPtr.Zero);
+            if (error != ErrorCode.Success)
+            {
+                var log = GetProgramBuildInfo(program, _device, ProgramBuildInfo.Log, out error).ToString();
+                throw new Exception($"Falha na compilação: {log}");
+            }
+
+            Kernel kernel = CreateKernel(program, kernelName, out error);
+            CheckError(error, $"Falha ao criar kernel {kernelName}");
+
+            programOut = program;
+            return kernel;
+        }
+    }
+
+    // ... (O restante do arquivo (métodos de operações, Dispose, etc.) permanece inalterado.) ...
+    public void Synchronize()
+    {
+        Finish(_commandQueue);
+    }
+
+    public IMathTensor CreateTensor(int[] shape) => new GpuTensor(shape, _context, _commandQueue);
+    public IMathTensor CreateTensor(double[] data, int[] shape) => new GpuTensor(data, shape, _context, _commandQueue);
+
+    public void VectorMatrixMultiply(IMathTensor vec, IMathTensor mat, IMathTensor res)
+    {
+        var tensorV = (GpuTensor)vec;
+        var tensorM = (GpuTensor)mat;
+        var tensorR = (GpuTensor)res;
+        int B = tensorV.Shape[0];
+        int N = tensorV.Shape[1];
+        int P = tensorM.Shape[1];
+
+        OpenCL.NetCore.Program program;
+        var kernel = LoadKernel("vector_matrix_multiply", out program);
+        SetKernelArg(kernel, 0, tensorV.Buffer);
+        SetKernelArg(kernel, 1, tensorM.Buffer);
+        SetKernelArg(kernel, 2, tensorR.Buffer);
+        SetKernelArg(kernel, 3, (uint)B);
+        SetKernelArg(kernel, 4, (uint)N);
+        SetKernelArg(kernel, 5, (uint)P);
+
+        EnqueueNDRangeKernel(_commandQueue, kernel, 2, null, new[] { (IntPtr)B, (IntPtr)P }, null, 0, null, out _);
+        ReleaseKernel(kernel);
+        ReleaseProgram(program);
+    }
+
+    public void MatrixMultiply(IMathTensor a, IMathTensor b, IMathTensor result)
+    {
+        var tensorA = (GpuTensor)a;
+        var tensorB = (GpuTensor)b;
+        var tensorC = (GpuTensor)result;
+        int M = tensorA.Shape[0];
+        int N = tensorA.Shape[1];
+        int P = tensorB.Shape[1];
+        OpenCL.NetCore.Program program;
+        var kernel = LoadKernel("matrix_multiply", out program);
+        SetKernelArg(kernel, 0, tensorA.Buffer);
+        SetKernelArg(kernel, 1, tensorB.Buffer);
+        SetKernelArg(kernel, 2, tensorC.Buffer);
+        SetKernelArg(kernel, 3, (uint)M);
+        SetKernelArg(kernel, 4, (uint)N);
+        SetKernelArg(kernel, 5, (uint)P);
+        EnqueueNDRangeKernel(_commandQueue, kernel, 2, null, new[] { (IntPtr)M, (IntPtr)P }, null, 0, null, out _);
+        ReleaseKernel(kernel);
+        ReleaseProgram(program);
+    }
+
+    public void Add(IMathTensor a, IMathTensor b, IMathTensor result)
+    {
+        OpenCL.NetCore.Program program;
+        var kernel = LoadKernel("add", out program);
+        SetKernelArg(kernel, 0, ((GpuTensor)a).Buffer);
+        SetKernelArg(kernel, 1, ((GpuTensor)b).Buffer);
+        SetKernelArg(kernel, 2, ((GpuTensor)result).Buffer);
+        EnqueueNDRangeKernel(_commandQueue, kernel, 1, null, new[] { (IntPtr)a.Length }, null, 0, null, out _);
+        ReleaseKernel(kernel);
+        ReleaseProgram(program);
+    }
+
+    public void AddBroadcast(IMathTensor a, IMathTensor bias, IMathTensor result)
+    {
+        OpenCL.NetCore.Program program;
+        var kernel = LoadKernel("add_broadcast", out program);
+        SetKernelArg(kernel, 0, ((GpuTensor)a).Buffer);
+        SetKernelArg(kernel, 1, ((GpuTensor)bias).Buffer);
+        SetKernelArg(kernel, 2, (uint)bias.Length);
+        EnqueueNDRangeKernel(_commandQueue, kernel, 1, null, new[] { (IntPtr)a.Length }, null, 0, null, out _);
+        ReleaseKernel(kernel);
+        ReleaseProgram(program);
+    }
+
+    public void Multiply(IMathTensor a, IMathTensor b, IMathTensor result)
+    {
+        OpenCL.NetCore.Program program;
+        var kernel = LoadKernel("multiply", out program);
+        SetKernelArg(kernel, 0, ((GpuTensor)a).Buffer);
+        SetKernelArg(kernel, 1, ((GpuTensor)b).Buffer);
+        SetKernelArg(kernel, 2, ((GpuTensor)result).Buffer);
+        EnqueueNDRangeKernel(_commandQueue, kernel, 1, null, new[] { (IntPtr)a.Length }, null, 0, null, out _);
+        ReleaseKernel(kernel);
+        ReleaseProgram(program);
+    }
+
+    public void Sigmoid(IMathTensor a, IMathTensor result)
+    {
+        OpenCL.NetCore.Program program;
+        var kernel = LoadKernel("sigmoid", out program);
+        SetKernelArg(kernel, 0, ((GpuTensor)a).Buffer);
+        SetKernelArg(kernel, 1, ((GpuTensor)result).Buffer);
+        EnqueueNDRangeKernel(_commandQueue, kernel, 1, null, new[] { (IntPtr)a.Length }, null, 0, null, out _);
+        ReleaseKernel(kernel);
+        ReleaseProgram(program);
+    }
+
+    public void Tanh(IMathTensor a, IMathTensor result)
+    {
+        OpenCL.NetCore.Program program;
+        var kernel = LoadKernel("tanh_activation", out program);
+        SetKernelArg(kernel, 0, ((GpuTensor)a).Buffer);
+        SetKernelArg(kernel, 1, ((GpuTensor)result).Buffer);
+        EnqueueNDRangeKernel(_commandQueue, kernel, 1, null, new[] { (IntPtr)a.Length }, null, 0, null, out _);
+        ReleaseKernel(kernel);
+        ReleaseProgram(program);
+    }
+
+    public IMathTensor Clone(IMathTensor tensor)
+    {
+        var gpuTensor = (GpuTensor)tensor;
+        var newTensor = CreateTensor(gpuTensor.Shape) as GpuTensor;
+        OpenCL.NetCore.Program program;
+        var kernel = LoadKernel("clone_buffer", out program);
+        SetKernelArg(kernel, 0, gpuTensor.Buffer);
+        SetKernelArg(kernel, 1, newTensor!.Buffer);
+        EnqueueNDRangeKernel(_commandQueue, kernel, 1, null, new[] { (IntPtr)gpuTensor.Length }, null, 0, null, out _);
+        ReleaseKernel(kernel);
+        ReleaseProgram(program);
+        return newTensor;
+    }
+
+    public void Transpose(IMathTensor input, IMathTensor result)
+    {
+        var tensorIn = (GpuTensor)input;
+        var tensorOut = (GpuTensor)result;
+        int rows = tensorIn.Shape[0];
+        int cols = tensorIn.Shape[1];
+        OpenCL.NetCore.Program program;
+        var kernel = LoadKernel("transpose", out program);
+        SetKernelArg(kernel, 0, tensorIn.Buffer);
+        SetKernelArg(kernel, 1, tensorOut.Buffer);
+        SetKernelArg(kernel, 2, (uint)rows);
+        SetKernelArg(kernel, 3, (uint)cols);
+        EnqueueNDRangeKernel(_commandQueue, kernel, 2, null, new[] { (IntPtr)rows, (IntPtr)cols }, null, 0, null,
+            out _);
+        ReleaseKernel(kernel);
+        ReleaseProgram(program);
+    }
+
+    public void Subtract(IMathTensor a, IMathTensor b, IMathTensor result)
+    {
+        OpenCL.NetCore.Program program;
+        var kernel = LoadKernel("subtract", out program);
+        SetKernelArg(kernel, 0, ((GpuTensor)a).Buffer);
+        SetKernelArg(kernel, 1, ((GpuTensor)b).Buffer);
+        SetKernelArg(kernel, 2, ((GpuTensor)result).Buffer);
+        EnqueueNDRangeKernel(_commandQueue, kernel, 1, null, new[] { (IntPtr)a.Length }, null, 0, null, out _);
+        ReleaseKernel(kernel);
+        ReleaseProgram(program);
+    }
+
+    public void SigmoidDerivative(IMathTensor output, IMathTensor result)
+    {
+        OpenCL.NetCore.Program program;
+        var kernel = LoadKernel("sigmoid_derivative", out program);
+        SetKernelArg(kernel, 0, ((GpuTensor)output).Buffer);
+        SetKernelArg(kernel, 1, ((GpuTensor)result).Buffer);
+        EnqueueNDRangeKernel(_commandQueue, kernel, 1, null, new[] { (IntPtr)output.Length }, null, 0, null, out _);
+        ReleaseKernel(kernel);
+        ReleaseProgram(program);
+    }
+
+    public void TanhDerivative(IMathTensor output, IMathTensor result)
+    {
+        OpenCL.NetCore.Program program;
+        var kernel = LoadKernel("tanh_derivative", out program);
+        SetKernelArg(kernel, 0, ((GpuTensor)output).Buffer);
+        SetKernelArg(kernel, 1, ((GpuTensor)result).Buffer);
+        EnqueueNDRangeKernel(_commandQueue, kernel, 1, null, new[] { (IntPtr)output.Length }, null, 0, null, out _);
+        ReleaseKernel(kernel);
+        ReleaseProgram(program);
+    }
+
+    public void MatrixMultiplyTransposeA(IMathTensor a, IMathTensor b, IMathTensor result)
+    {
+        var tensorA = (GpuTensor)a;
+        var tensorB = (GpuTensor)b;
+        var tensorC = (GpuTensor)result;
+        int M = tensorA.Shape[1];
+        int K = tensorA.Shape[0];
+        int P = tensorB.Shape[1];
+        OpenCL.NetCore.Program program;
+        var kernel = LoadKernel("matrix_multiply_transpose_a", out program);
+        SetKernelArg(kernel, 0, tensorA.Buffer);
+        SetKernelArg(kernel, 1, tensorB.Buffer);
+        SetKernelArg(kernel, 2, tensorC.Buffer);
+        SetKernelArg(kernel, 3, (uint)M);
+        SetKernelArg(kernel, 4, (uint)K);
+        SetKernelArg(kernel, 5, (uint)P);
+        EnqueueNDRangeKernel(_commandQueue, kernel, 2, null, new[] { (IntPtr)M, (IntPtr)P }, null, 0, null, out _);
+        ReleaseKernel(kernel);
+        ReleaseProgram(program);
+    }
+
+    public void MatrixMultiplyTransposeB(IMathTensor a, IMathTensor b, IMathTensor result)
+    {
+        var tensorA = (GpuTensor)a;
+        var tensorB = (GpuTensor)b;
+        var tensorC = (GpuTensor)result;
+        int M = tensorA.Shape[0];
+        int K = tensorA.Shape[1];
+        int P = tensorB.Shape[0];
+        OpenCL.NetCore.Program program;
+        var kernel = LoadKernel("matrix_multiply_transpose_b", out program);
+        SetKernelArg(kernel, 0, tensorA.Buffer);
+        SetKernelArg(kernel, 1, tensorB.Buffer);
+        SetKernelArg(kernel, 2, tensorC.Buffer);
+        SetKernelArg(kernel, 3, (uint)M);
+        SetKernelArg(kernel, 4, (uint)K);
+        SetKernelArg(kernel, 5, (uint)P);
+        EnqueueNDRangeKernel(_commandQueue, kernel, 2, null, new[] { (IntPtr)M, (IntPtr)P }, null, 0, null, out _);
+        ReleaseKernel(kernel);
+        ReleaseProgram(program);
+    }
+
+    public void AddScaled(IMathTensor target, IMathTensor source, double scalar)
+    {
+        OpenCL.NetCore.Program program;
+        var kernel = LoadKernel("add_scaled", out program);
+        SetKernelArg(kernel, 0, ((GpuTensor)target).Buffer);
+        SetKernelArg(kernel, 1, ((GpuTensor)source).Buffer);
+        SetKernelArg(kernel, 2, (float)scalar);
+        EnqueueNDRangeKernel(_commandQueue, kernel, 1, null, new[] { (IntPtr)target.Length }, null, 0, null, out _);
+        ReleaseKernel(kernel);
+        ReleaseProgram(program);
+    }
+
+    public void SubtractScaled(IMathTensor target, IMathTensor source, double scalar)
+    {
+        OpenCL.NetCore.Program program;
+        var kernel = LoadKernel("subtract_scaled", out program);
+        SetKernelArg(kernel, 0, ((GpuTensor)target).Buffer);
+        SetKernelArg(kernel, 1, ((GpuTensor)source).Buffer);
+        SetKernelArg(kernel, 2, (float)scalar);
+        EnqueueNDRangeKernel(_commandQueue, kernel, 1, null, new[] { (IntPtr)target.Length }, null, 0, null, out _);
+        ReleaseKernel(kernel);
+        ReleaseProgram(program);
+    }
+
+    public void Slice(IMathTensor source, int rowIndex, IMathTensor destination)
+    {
+        var featureSize = (int)destination.Length;
+        var offset = rowIndex * featureSize;
+        OpenCL.NetCore.Program program;
+        var kernel = LoadKernel("slice", out program);
+        SetKernelArg(kernel, 0, ((GpuTensor)source).Buffer);
+        SetKernelArg(kernel, 1, ((GpuTensor)destination).Buffer);
+        SetKernelArg(kernel, 2, (uint)offset);
+        SetKernelArg(kernel, 3, (uint)featureSize);
+        EnqueueNDRangeKernel(_commandQueue, kernel, 1, null, new[] { (IntPtr)featureSize }, null, 0, null, out _);
+        ReleaseKernel(kernel);
+        ReleaseProgram(program);
+    }
+
+    public void Set(IMathTensor destination, int rowIndex, IMathTensor source)
+    {
+        var featureSize = (int)source.Length;
+        var offset = rowIndex * featureSize;
+        OpenCL.NetCore.Program program;
+        var kernel = LoadKernel("set", out program);
+        SetKernelArg(kernel, 0, ((GpuTensor)destination).Buffer);
+        SetKernelArg(kernel, 1, ((GpuTensor)source).Buffer);
+        SetKernelArg(kernel, 2, (uint)offset);
+        SetKernelArg(kernel, 3, (uint)featureSize);
+        EnqueueNDRangeKernel(_commandQueue, kernel, 1, null, new[] { (IntPtr)featureSize }, null, 0, null, out _);
+        ReleaseKernel(kernel);
+        ReleaseProgram(program);
+    }
+
+    public void Clip(IMathTensor tensor, double minValue, double maxValue)
+    {
+        OpenCL.NetCore.Program program;
+        var kernel = LoadKernel("clip", out program);
+        SetKernelArg(kernel, 0, ((GpuTensor)tensor).Buffer);
+        SetKernelArg(kernel, 1, (float)minValue);
+        SetKernelArg(kernel, 2, (float)maxValue);
+        EnqueueNDRangeKernel(_commandQueue, kernel, 1, null, new[] { (IntPtr)tensor.Length }, null, 0, null, out _);
+        ReleaseKernel(kernel);
+        ReleaseProgram(program);
+    }
+
+    public void Scale(IMathTensor tensor, double scalar)
+    {
+        OpenCL.NetCore.Program program;
+        var kernel = LoadKernel("scale", out program);
+        SetKernelArg(kernel, 0, ((GpuTensor)tensor).Buffer);
+        SetKernelArg(kernel, 1, (float)scalar);
+        EnqueueNDRangeKernel(_commandQueue, kernel, 1, null, new[] { (IntPtr)tensor.Length }, null, 0, null, out _);
+        ReleaseKernel(kernel);
+        ReleaseProgram(program);
+    }
+
+    public void Softmax(IMathTensor input, IMathTensor result)
+    {
+        var tensorIn = (GpuTensor)input;
+        var tensorOut = (GpuTensor)result;
+        int rows = tensorIn.Shape[0];
+        int cols = tensorIn.Shape[1];
+        OpenCL.NetCore.Program program;
+        var kernel = LoadKernel("softmax", out program);
+        SetKernelArg(kernel, 0, tensorIn.Buffer);
+        SetKernelArg(kernel, 1, tensorOut.Buffer);
+        SetKernelArg(kernel, 2, (uint)cols);
+        EnqueueNDRangeKernel(_commandQueue, kernel, 1, null, new[] { (IntPtr)rows }, null, 0, null, out _);
+        ReleaseKernel(kernel);
+        ReleaseProgram(program);
+    }
+
+    public void Lookup(IMathTensor embeddingMatrix, int index, IMathTensor result)
+    {
+        var embeddingSize = embeddingMatrix.Shape[1];
+        OpenCL.NetCore.Program program;
+        var kernel = LoadKernel("lookup", out program);
+        SetKernelArg(kernel, 0, ((GpuTensor)embeddingMatrix).Buffer);
+        SetKernelArg(kernel, 1, ((GpuTensor)result).Buffer);
+        SetKernelArg(kernel, 2, (uint)index);
+        SetKernelArg(kernel, 3, (uint)embeddingSize);
+        EnqueueNDRangeKernel(_commandQueue, kernel, 1, null, new[] { (IntPtr)embeddingSize }, null, 0, null, out _);
+        ReleaseKernel(kernel);
+        ReleaseProgram(program);
+    }
+
+    public void AccumulateGradient(IMathTensor embeddingGradients, IMathTensor gradient, int index)
+    {
+        var embeddingSize = embeddingGradients.Shape[1];
+        OpenCL.NetCore.Program program;
+        var kernel = LoadKernel("accumulate_gradient_no_atomic", out program);
+        SetKernelArg(kernel, 0, ((GpuTensor)embeddingGradients).Buffer);
+        SetKernelArg(kernel, 1, ((GpuTensor)gradient).Buffer);
+        SetKernelArg(kernel, 2, (uint)index);
+        SetKernelArg(kernel, 3, (uint)embeddingSize);
+        EnqueueNDRangeKernel(_commandQueue, kernel, 1, null, new[] { (IntPtr)embeddingSize }, null, 0, null, out _);
+        ReleaseKernel(kernel);
+        ReleaseProgram(program);
+    }
+
+    public IMathTensor CreateOneHotTensor(int[] indices, int totalClasses)
+    {
+        int sequenceLength = indices.Length;
+        var resultTensor = new GpuTensor(new[] { sequenceLength, totalClasses }, _context, _commandQueue);
+
+        ErrorCode error;
+        var indicesBuffer = (Mem)CreateBuffer(_context, MemFlags.ReadOnly | MemFlags.CopyHostPtr,
+            (IntPtr)(indices.Length * sizeof(int)), indices, out error);
+        CheckError(error);
+
+        OpenCL.NetCore.Program program;
+        var kernel = LoadKernel("one_hot_encode", out program);
+        SetKernelArg(kernel, 0, resultTensor.Buffer);
+        SetKernelArg(kernel, 1, indicesBuffer);
+        SetKernelArg(kernel, 2, (uint)totalClasses);
+
+        EnqueueNDRangeKernel(_commandQueue, kernel, 1, null, new[] { (IntPtr)sequenceLength }, null, 0, null, out _);
+
+        ReleaseKernel(kernel);
+        ReleaseProgram(program);
+        ReleaseMemObject(indicesBuffer);
+
+        return resultTensor;
+    }
+
+    public void AdamUpdate(IMathTensor parameters, IMathTensor gradients, IMathTensor m, IMathTensor v,
+        double lr, double beta1, double beta2, double epsilon, int t)
+    {
+        OpenCL.NetCore.Program program;
+        var kernel = LoadKernel("adam_update", out program);
+        SetKernelArg(kernel, 0, ((GpuTensor)parameters).Buffer);
+        SetKernelArg(kernel, 1, ((GpuTensor)gradients).Buffer);
+        SetKernelArg(kernel, 2, ((GpuTensor)m).Buffer);
+        SetKernelArg(kernel, 3, ((GpuTensor)v).Buffer);
+        SetKernelArg(kernel, 4, (float)lr);
+        SetKernelArg(kernel, 5, (float)beta1);
+        SetKernelArg(kernel, 6, (float)beta2);
+        SetKernelArg(kernel, 7, (float)epsilon);
+        SetKernelArg(kernel, 8, (uint)t);
+
+        EnqueueNDRangeKernel(_commandQueue, kernel, 1, null, new[] { (IntPtr)parameters.Length }, null, 0, null, out _);
+        ReleaseKernel(kernel);
+        ReleaseProgram(program);
+    }
+
+    public void Dispose()
+    {
+        if (_disposed) return;
+        ReleaseCommandQueue(_commandQueue);
+        ReleaseContext(_context);
+        _disposed = true;
+        GC.SuppressFinalize(this);
+    }
+
+    private void CheckError(ErrorCode error, string message = "Erro OpenCL não especificado.")
+    {
+        if (error != ErrorCode.Success) throw new OpenClException(message, error);
+    }
+}

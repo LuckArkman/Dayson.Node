@@ -30,7 +30,7 @@ public class TeacherModelService
     private const string ApiKey = "AIzaSyDEsWciYO_Zyi58pE9nXOH_C_Coe88FJ4Q"; 
 
     // Endpoint para um modelo rápido e estável do Gemini.
-    private const string ApiEndpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-lite:generateContent";
+    private const string ApiEndpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent";
 
     private const int VOCAB_CONTEXT_SIZE = 4000;
 

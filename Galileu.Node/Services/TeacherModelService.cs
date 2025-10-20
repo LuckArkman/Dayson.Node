@@ -27,7 +27,7 @@ public class TeacherModelService
     // SUBSTITUA O TEXTO ABAIXO PELA SUA CHAVE DE API VÁLIDA DO GOOGLE AI STUDIO.
     // Lembre-se de NUNCA compartilhar esta chave em repositórios públicos.
     // ====================================================================
-    private const string ApiKey = "SUA_NOVA_CHAVE_DE_API_AQUI"; 
+    private const string ApiKey = "AIzaSyDEsWciYO_Zyi58pE9nXOH_C_Coe88FJ4Q"; 
 
     // Endpoint para um modelo rápido e estável do Gemini.
     private const string ApiEndpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-lite:generateContent";

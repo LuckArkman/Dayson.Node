@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
@@ -6,6 +7,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using Galileu.Node.Data;
 using MongoDB.Bson;
@@ -27,16 +29,36 @@ public class TeacherModelService
     // SUBSTITUA O TEXTO ABAIXO PELA SUA CHAVE DE API VÁLIDA DO GOOGLE AI STUDIO.
     // Lembre-se de NUNCA compartilhar esta chave em repositórios públicos.
     // ====================================================================
-    private const string ApiKey = "AIzaSyDEsWciYO_Zyi58pE9nXOH_C_Coe88FJ4Q"; 
+    private const string ApiKey = "AIzaSyDEsWciYO_Zyi58pE9nXOH_C_Coe88FJ4Q";
 
     // Endpoint para um modelo rápido e estável do Gemini.
     private const string ApiEndpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent";
 
     private const int VOCAB_CONTEXT_SIZE = 4000;
+    
+    // ====================================================================
+    // INÍCIO DA IMPLEMENTAÇÃO DO CONTROLE DE TAXA (RATE LIMITING)
+    // ====================================================================
+    
+    // Define o número máximo de requisições permitidas por minuto.
+    private const int MaxRequestsPerMinute = 15;
+    
+    // Define a janela de tempo para o controle de taxa (1 minuto).
+    private static readonly TimeSpan RateLimitTimeWindow = TimeSpan.FromMinutes(1);
+    
+    // Fila thread-safe para armazenar os timestamps das requisições recentes.
+    private readonly ConcurrentQueue<DateTime> _requestTimestamps = new();
+    
+    // Semáforo para garantir que a verificação do limite seja atômica (evita race conditions).
+    private readonly SemaphoreSlim _rateLimitLock = new(1, 1);
+
+    // ====================================================================
+    // FIM DA IMPLEMENTAÇÃO DO CONTROLE DE TAXA
+    // ====================================================================
 
     public TeacherModelService(MongoDbService mongoDbService)
     {
-        _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
+        _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(220) };
         _httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         _mongoDbService = mongoDbService;
     }
@@ -182,10 +204,57 @@ public class TeacherModelService
     }
 
     /// <summary>
+    /// Aguarda, se necessário, para garantir que o limite de requisições por minuto não seja excedido.
+    /// </summary>
+    private async Task WaitForRateLimitAsync()
+    {
+        await _rateLimitLock.WaitAsync();
+        try
+        {
+            // Loop para garantir que, após a espera, a condição seja reavaliada.
+            while (true)
+            {
+                var now = DateTime.UtcNow;
+                var boundary = now.Subtract(RateLimitTimeWindow);
+
+                // Remove timestamps da fila que são mais antigos que a janela de tempo.
+                while (_requestTimestamps.TryPeek(out var oldest) && oldest < boundary)
+                {
+                    _requestTimestamps.TryDequeue(out _);
+                }
+
+                // Se a contagem de requisições na janela de tempo for menor que o limite, permite prosseguir.
+                if (_requestTimestamps.Count < MaxRequestsPerMinute)
+                {
+                    _requestTimestamps.Enqueue(now);
+                    break; // Sai do loop e permite a execução da chamada API.
+                }
+
+                // Se o limite foi atingido, calcula o tempo de espera necessário.
+                _requestTimestamps.TryPeek(out var nextAvailableSlot);
+                var waitTime = (nextAvailableSlot + RateLimitTimeWindow) - now;
+
+                if (waitTime > TimeSpan.Zero)
+                {
+                    await Task.Delay(waitTime);
+                }
+            }
+        }
+        finally
+        {
+            _rateLimitLock.Release();
+        }
+    }
+
+    /// <summary>
     /// Lógica de comunicação com a API do Gemini, com tratamento de erros robusto.
+    /// Esta função agora respeita o limite de 15 requisições por minuto.
     /// </summary>
     public async Task<string> CallApiAsync(string prompt)
     {
+        // Garante que o limite de taxa seja respeitado antes de fazer a chamada.
+        await WaitForRateLimitAsync();
+
         try
         {
             var requestBody = new { contents = new[] { new { parts = new[] { new { text = prompt } } } } };
@@ -220,7 +289,7 @@ public class TeacherModelService
         }
         catch (TaskCanceledException ex)
         {
-            Console.WriteLine($"\n[Teacher] ERRO: Timeout na chamada da API. A requisição demorou mais de 120 segundos. Detalhes: {ex.Message}");
+            Console.WriteLine($"\n[Teacher] ERRO: Timeout na chamada da API. A requisição demorou mais de 220 segundos. Detalhes: {ex.Message}");
             return "";
         }
         catch (HttpRequestException ex)

@@ -16,12 +16,14 @@ public class GenerativeService
     private readonly ISearchService _searchService = new MockSearchService();
     private readonly IMathEngine _mathEngine;
     private readonly PrimingService _primingService;
+    private readonly MongoDbService _mongoDbService;
     private GenerativeNeuralNetworkLSTM? _model;
     public bool IsModelLoaded => _model != null;
 
-    public GenerativeService(PrimingService primingService)
+    public GenerativeService(PrimingService primingService, MongoDbService mongoDbService)
     {
         _primingService = primingService;
+        _mongoDbService = mongoDbService;
         try
         {
             _mathEngine = new GpuMathEngine();
@@ -112,7 +114,7 @@ public class GenerativeService
                 );
                 initialModel.RunSanityCheck();
 
-                var teacherService = new TeacherModelService();
+                var teacherService = new TeacherModelService(_mongoDbService);
                 var hybridTrainer = new HybridTrainer(_mathEngine, teacherService);
 
                 Console.WriteLine("\n[GenerativeService] Iniciando treinamento HÍBRIDO CONTÍNUO com professor de IA...");

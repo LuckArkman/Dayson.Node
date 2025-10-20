@@ -14,6 +14,7 @@
           "Microsoft.AspNetCore.Authentication.JwtBearer": "8.0.0",
           "Microsoft.Extensions.Hosting": "8.0.0",
           "Microsoft.IdentityModel.Tokens": "8.14.0",
+          "MongoDB.Bson": "3.5.0",
           "MongoDB.Driver": "3.5.0",
           "OpenCL.Net": "2.2.9",
           "OpenCL.NetCore": "1.2.0",

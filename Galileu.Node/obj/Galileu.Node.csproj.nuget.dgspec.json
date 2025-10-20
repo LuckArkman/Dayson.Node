@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "/home/mplopes/Documentos/GitHub/Dayson.Node/Galileu.Node/Galileu.Node.csproj": {}
+    "/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Galileu.Node.csproj": {}
   },
   "projects": {
-    "/home/mplopes/Documentos/GitHub/Dayson.Node/Galileu.Node/Galileu.Node.csproj": {
+    "/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Galileu.Node.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "/home/mplopes/Documentos/GitHub/Dayson.Node/Galileu.Node/Galileu.Node.csproj",
+        "projectUniqueName": "/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Galileu.Node.csproj",
         "projectName": "Galileu.Node",
-        "projectPath": "/home/mplopes/Documentos/GitHub/Dayson.Node/Galileu.Node/Galileu.Node.csproj",
+        "projectPath": "/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Galileu.Node.csproj",
         "packagesPath": "/home/mplopes/.nuget/packages/",
-        "outputPath": "/home/mplopes/Documentos/GitHub/Dayson.Node/Galileu.Node/obj/",
+        "outputPath": "/home/mplopes/Documentos/Dayson.Node/Galileu.Node/obj/",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "/home/mplopes/.nuget/NuGet/NuGet.Config"
@@ -68,6 +68,10 @@
             "Microsoft.IdentityModel.Tokens": {
               "target": "Package",
               "version": "[8.14.0, )"
+            },
+            "MongoDB.Bson": {
+              "target": "Package",
+              "version": "[3.5.0, )"
             },
             "MongoDB.Driver": {
               "target": "Package",

@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "QkC8cI/rE50=",
+  "dgSpecHash": "H1sjrsdCt48=",
   "success": true,
-  "projectFilePath": "/home/mplopes/Documentos/GitHub/Dayson.Node/Galileu.Node/Galileu.Node.csproj",
+  "projectFilePath": "/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Galileu.Node.csproj",
   "expectedPackageFiles": [
     "/home/mplopes/.nuget/packages/akka/1.5.49/akka.1.5.49.nupkg.sha512",
     "/home/mplopes/.nuget/packages/akka.analyzers/0.3.3/akka.analyzers.0.3.3.nupkg.sha512",
@@ -174,9 +174,9 @@
       "code": "NU1904",
       "level": "Warning",
       "message": "O pacote 'Akka.Remote' 1.5.27 tem uma crítico vulnerabilidade de gravidade conhecida, https://github.com/advisories/GHSA-jhpv-4q4f-43g5",
-      "projectPath": "/home/mplopes/Documentos/GitHub/Dayson.Node/Galileu.Node/Galileu.Node.csproj",
+      "projectPath": "/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Galileu.Node.csproj",
       "warningLevel": 1,
-      "filePath": "/home/mplopes/Documentos/GitHub/Dayson.Node/Galileu.Node/Galileu.Node.csproj",
+      "filePath": "/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Galileu.Node.csproj",
       "libraryId": "Akka.Remote",
       "targetGraphs": [
         "net8.0"
@@ -186,9 +186,9 @@
       "code": "NU1701",
       "level": "Warning",
       "message": "O pacote 'OpenCL.Net 2.2.9' foi restaurado usando '.NETFramework,Version=v4.6.1, .NETFramework,Version=v4.6.2, .NETFramework,Version=v4.7, .NETFramework,Version=v4.7.1, .NETFramework,Version=v4.7.2, .NETFramework,Version=v4.8, .NETFramework,Version=v4.8.1' em vez da estrutura de destino do projeto 'net8.0'. Esse pacote pode não ser totalmente compatível com o seu projeto.",
-      "projectPath": "/home/mplopes/Documentos/GitHub/Dayson.Node/Galileu.Node/Galileu.Node.csproj",
+      "projectPath": "/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Galileu.Node.csproj",
       "warningLevel": 1,
-      "filePath": "/home/mplopes/Documentos/GitHub/Dayson.Node/Galileu.Node/Galileu.Node.csproj",
+      "filePath": "/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Galileu.Node.csproj",
       "libraryId": "OpenCL.Net",
       "targetGraphs": [
         "net8.0"

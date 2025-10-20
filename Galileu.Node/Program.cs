@@ -32,6 +32,7 @@ builder.WebHost.UseUrls(myAddress);
 builder.Services.AddSingleton<PrimingService>();
 builder.Services.AddSingleton(new NodeState(myAddress));
 builder.Services.AddSingleton<PolymorphicTypeResolver>();
+builder.Services.AddSingleton<MongoDbService>(); 
 builder.Services.AddSingleton(provider => new NodeClient(provider.GetRequiredService<PolymorphicTypeResolver>()));
 builder.Services.AddHostedService<GossipService>();
 builder.Services.AddSingleton<NodeRegistryService>();

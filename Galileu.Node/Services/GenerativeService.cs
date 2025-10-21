@@ -47,7 +47,7 @@ public class GenerativeService
         {
             const int VOCAB_SIZE = 20000;
             const int EMBEDDING_SIZE = 128;
-            const int HIDDEN_SIZE = 196;
+            const int HIDDEN_SIZE = 256;
             const int CONTEXT_WINDOW = 5;
 
             GenerativeNeuralNetworkLSTM? initialModel = null;
@@ -102,7 +102,7 @@ public class GenerativeService
         {
             const int VOCAB_SIZE = 20000;
             const int EMBEDDING_SIZE = 128;
-            const int HIDDEN_SIZE = 196;
+            const int HIDDEN_SIZE = 256;
 
             GenerativeNeuralNetworkLSTM? initialModel = null;
             try

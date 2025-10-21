@@ -97,8 +97,9 @@ public class TeacherModelService
             }
 
             var userPrompt = instructions.ToString();
+            
             var fullPrompt = $"{systemPrompt}\n\n{userPrompt}";
-
+            //Console.WriteLine(fullPrompt);
             var jsonResponse = await CallApiAsync(fullPrompt);
 
             if (!string.IsNullOrEmpty(jsonResponse))

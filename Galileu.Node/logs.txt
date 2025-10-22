@@ -1,161 +1,0 @@
-Usando as configurações de inicialização de /home/mplopes/Documentos/Dayson.Node/Galileu.Node/Properties/launchSettings.json...
-Compilando...
-/usr/share/dotnet/sdk/9.0.300/Sdks/Microsoft.NET.Sdk/targets/Microsoft.NET.Sdk.DefaultItems.Shared.targets(111,5): warning NETSDK1080: um PackageReference para Microsoft.AspNetCore.App não é necessário quando direcionado ao .NET Core 3.0 ou superior. Se o Microsoft.NET.Sdk.Web for usado, a estrutura compartilhada será referenciada automaticamente. Caso contrário, o PackageReference deverá ser substituído por um FrameworkReference. [/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Galileu.Node.csproj]
-/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Galileu.Node.csproj : warning NU1904: O pacote 'Akka.Remote' 1.5.27 tem uma crítico vulnerabilidade de gravidade conhecida, https://github.com/advisories/GHSA-jhpv-4q4f-43g5
-/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Galileu.Node.csproj : warning NU1701: O pacote 'OpenCL.Net 2.2.9' foi restaurado usando '.NETFramework,Version=v4.6.1, .NETFramework,Version=v4.6.2, .NETFramework,Version=v4.7, .NETFramework,Version=v4.7.1, .NETFramework,Version=v4.7.2, .NETFramework,Version=v4.8, .NETFramework,Version=v4.8.1' em vez da estrutura de destino do projeto 'net8.0'. Esse pacote pode não ser totalmente compatível com o seu projeto.
-/usr/share/dotnet/sdk/9.0.300/Sdks/Microsoft.NET.Sdk/targets/Microsoft.NET.Sdk.DefaultItems.Shared.targets(111,5): warning NETSDK1080: um PackageReference para Microsoft.AspNetCore.App não é necessário quando direcionado ao .NET Core 3.0 ou superior. Se o Microsoft.NET.Sdk.Web for usado, a estrutura compartilhada será referenciada automaticamente. Caso contrário, o PackageReference deverá ser substituído por um FrameworkReference. [/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Galileu.Node.csproj]
-/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Galileu.Node.csproj : warning NU1904: O pacote 'Akka.Remote' 1.5.27 tem uma crítico vulnerabilidade de gravidade conhecida, https://github.com/advisories/GHSA-jhpv-4q4f-43g5
-/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Galileu.Node.csproj : warning NU1701: O pacote 'OpenCL.Net 2.2.9' foi restaurado usando '.NETFramework,Version=v4.6.1, .NETFramework,Version=v4.6.2, .NETFramework,Version=v4.7, .NETFramework,Version=v4.7.1, .NETFramework,Version=v4.7.2, .NETFramework,Version=v4.8, .NETFramework,Version=v4.8.1' em vez da estrutura de destino do projeto 'net8.0'. Esse pacote pode não ser totalmente compatível com o seu projeto.
-/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Controllers/NodeController.cs(30,13): warning CS8625: Não é possível converter um literal nulo em um tipo de referência não anulável. [/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Galileu.Node.csproj]
-/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Program.cs(67,47): warning CS1998: Este método assíncrono não possui operadores 'await' e será executado de modo síncrono. É recomendável o uso do operador 'await' para aguardar chamadas à API desbloqueadas ou do operador 'await Task.Run(...)' para realizar um trabalho associado à CPU em um thread em segundo plano. [/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Galileu.Node.csproj]
-/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Services/WalletService.cs(16,12): warning CS8618: O campo não anulável '_transactions' precisa conter um valor não nulo ao sair do construtor. Considere adicionar o modificador "obrigatório" ou declarar o campo como anulável. [/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Galileu.Node.csproj]
-/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Services/WalletService.cs(16,12): warning CS8618: O campo não anulável '_wallets' precisa conter um valor não nulo ao sair do construtor. Considere adicionar o modificador "obrigatório" ou declarar o campo como anulável. [/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Galileu.Node.csproj]
-/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Services/WalletService.cs(16,12): warning CS8618: O campo não anulável '_logger' precisa conter um valor não nulo ao sair do construtor. Considere adicionar o modificador "obrigatório" ou declarar o campo como anulável. [/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Galileu.Node.csproj]
-/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Brain/TextMetricsCalculator.cs(117,37): warning CS8603: Possível retorno de referência nula. [/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Galileu.Node.csproj]
-/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Brain/DiskOnlyCacheManager.cs(240,25): warning CS8625: Não é possível converter um literal nulo em um tipo de referência não anulável. [/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Galileu.Node.csproj]
-/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Brain/DiskOnlyCacheManager.cs(241,21): warning CS8625: Não é possível converter um literal nulo em um tipo de referência não anulável. [/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Galileu.Node.csproj]
-/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Core/TensorData.cs(5,21): warning CS8618: O propriedade não anulável 'data' precisa conter um valor não nulo ao sair do construtor. Considere adicionar o modificador "obrigatório" ou declarar o propriedade como anulável. [/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Galileu.Node.csproj]
-/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Core/TensorData.cs(6,18): warning CS8618: O propriedade não anulável 'shape' precisa conter um valor não nulo ao sair do construtor. Considere adicionar o modificador "obrigatório" ou declarar o propriedade como anulável. [/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Galileu.Node.csproj]
-/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Brain/DiskOnlyCacheManager.cs(265,29): warning CS8625: Não é possível converter um literal nulo em um tipo de referência não anulável. [/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Galileu.Node.csproj]
-/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Brain/DiskOnlyCacheManager.cs(268,25): warning CS8625: Não é possível converter um literal nulo em um tipo de referência não anulável. [/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Galileu.Node.csproj]
-/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Brain/HybridTrainer.cs(82,64): warning CS8604: Possível argumento de referência nula para o parâmetro 'baseModel' em 'GenerativeNeuralNetworkLSTM.GenerativeNeuralNetworkLSTM(NeuralNetworkLSTM baseModel, VocabularyManager vocabManager, ISearchService? searchService)'. [/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Galileu.Node.csproj]
-/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Brain/HybridTrainer.cs(150,64): warning CS8604: Possível argumento de referência nula para o parâmetro 'baseModel' em 'GenerativeNeuralNetworkLSTM.GenerativeNeuralNetworkLSTM(NeuralNetworkLSTM baseModel, VocabularyManager vocabManager, ISearchService? searchService)'. [/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Galileu.Node.csproj]
-/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Brain/NeuralNetworkLSTM.cs(53,12): warning CS8618: O campo não anulável 'gpuEngine' precisa conter um valor não nulo ao sair do construtor. Considere adicionar o modificador "obrigatório" ou declarar o campo como anulável. [/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Galileu.Node.csproj]
-/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Gpu/GpuMathEngine.cs(348,73): warning CS8604: Possível argumento de referência nula para o parâmetro 'args' em 'void GpuMathEngine.ExecuteKernel1D(Kernel kernel, long globalSize, params object[] args)'. [/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Galileu.Node.csproj]
-/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Gpu/GpuMathEngine.cs(446,62): warning CS8604: Possível argumento de referência nula para o parâmetro 'args' em 'void GpuMathEngine.ExecuteKernel1D(Kernel kernel, long globalSize, params object[] args)'. [/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Galileu.Node.csproj]
-/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Brain/ModelTrainerLSTM.cs(86,17): warning CS8602: Desreferência de uma referência possivelmente nula. [/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Galileu.Node.csproj]
-/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Brain/ModelTrainerLSTM.cs(104,51): warning CS8604: Possível argumento de referência nula para o parâmetro 'modelToValidate' em 'double ModelTrainerLSTM.ValidateModel(GenerativeNeuralNetworkLSTM modelToValidate, DatasetService datasetService)'. [/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Galileu.Node.csproj]
-/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Services/TeacherModelService.cs(111,49): warning CS8602: Desreferência de uma referência possivelmente nula. [/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Galileu.Node.csproj]
-/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Brain/NeuralNetworkLSTM.cs(285,33): warning CS8602: Desreferência de uma referência possivelmente nula. [/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Galileu.Node.csproj]
-/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Brain/NeuralNetworkLSTM.cs(557,15): warning CS8618: O campo não anulável 'gpuEngine' precisa conter um valor não nulo ao sair do construtor. Considere adicionar o modificador "obrigatório" ou declarar o campo como anulável. [/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Galileu.Node.csproj]
-/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Brain/NeuralNetworkLSTM.cs(654,9): warning CS8602: Desreferência de uma referência possivelmente nula. [/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Galileu.Node.csproj]
-/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Brain/NeuralNetworkLSTM.cs(671,9): warning CS8602: Desreferência de uma referência possivelmente nula. [/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Galileu.Node.csproj]
-/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Brain/NeuralNetworkLSTM.cs(753,70): warning CS8604: Possível argumento de referência nula para o parâmetro 'targets' em '(IMathTensor predictions, double loss) NeuralNetworkLSTM.ForwardPassGpuOptimized(int[] inputIndices, IMathTensor targets, int sequenceLength)'. [/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Galileu.Node.csproj]
-/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Brain/NeuralNetworkLSTM.cs(787,52): warning CS8601: Possível atribuição de referência nula. [/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Galileu.Node.csproj]
-/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Brain/NeuralNetworkLSTM.cs(1498,52): warning CS8601: Possível atribuição de referência nula. [/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Galileu.Node.csproj]
-/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Brain/NeuralNetworkLSTM.cs(1669,73): warning CS8604: Possível argumento de referência nula para o parâmetro 'targets' em '(IMathTensor predictions, double loss) NeuralNetworkLSTM.ForwardPassGpuOptimized(int[] inputIndices, IMathTensor targets, int sequenceLength)'. [/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Galileu.Node.csproj]
-/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Services/WalletService.cs(13,55): warning CS0649: Campo "WalletService._wallets" nunca é atribuído e sempre terá seu valor padrão null [/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Galileu.Node.csproj]
-/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Services/WalletService.cs(12,60): warning CS0649: Campo "WalletService._transactions" nunca é atribuído e sempre terá seu valor padrão null [/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Galileu.Node.csproj]
-/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Services/WalletService.cs(14,45): warning CS0649: Campo "WalletService._logger" nunca é atribuído e sempre terá seu valor padrão null [/home/mplopes/Documentos/Dayson.Node/Galileu.Node/Galileu.Node.csproj]
- === Swagger Acess http://localhost:44047/swagger/index.html ===
-info: Services.GossipService[0]
-      Gossip Service iniciado. Fofocando a cada 15 segundos.
-[INFO][10/20/2025 22:06:11.623Z][Thread 0001][remoting (akka://Dyson-System)] Starting remoting
-[INFO][10/20/2025 22:06:11.775Z][Thread 0001][remoting (akka://Dyson-System)] Remoting started; listening on addresses : [akka.tcp://Dyson-System@localhost:54047]
-[INFO][10/20/2025 22:06:11.776Z][Thread 0001][remoting (akka://Dyson-System)] Remoting now listens on addresses: [akka.tcp://Dyson-System@localhost:54047]
-[Akka] Sistema de Atores iniciado em akka.tcp://Dyson-System@localhost:54047
-info: Microsoft.Hosting.Lifetime[14]
-      Now listening on: http://localhost:44047
-info: Microsoft.Hosting.Lifetime[0]
-      Application started. Press Ctrl+C to shut down.
-info: Microsoft.Hosting.Lifetime[0]
-      Hosting environment: Development
-info: Microsoft.Hosting.Lifetime[0]
-      Content root path: /home/mplopes/Documentos/Dayson.Node/Galileu.Node
-[Registry] Nó specialized-node-4196914c em http://localhost:44047 registrado.
-Iniciando registro com o Orquestrador em http://localhost:5001...
-ERRO CRÍTICO no registro: Connection refused (localhost:5001). O nó não pode se juntar à rede e permanecerá em modo de espera.
-[OpenCL] Usando dispositivo: gfx803
-[GenerativeService] Usando GpuMathEngine para aceleração.
-
-=============================================
-CONFIGURAÇÃO DE TREINAMENTO HÍBRIDO CONTÍNUO
-MODO: LONGO PRAZO (SUPERVISIONADO + REFORÇO)
-=============================================
-
-[Config] Dataset: pt_0.txt
-[Config] Total de Épocas: 100
-[Config] Learning Rate (SFT): 0,001
-[Config] Batch Size: 24
-[Config] META: RAM < 10GB e aprendizado contínuo.
-
-========================================
-INICIANDO TREINAMENTO HÍBRIDO
-Monitoramento de memória: ATIVO
-========================================
-
-AVISO IMPORTANTE: Certifique-se de que sua chave de API e endpoint do modelo professor
-estejam configurados corretamente no arquivo 'TeacherModelService.cs'.
-
-[GenerativeService] Inicializando modelo LSTM para treinamento híbrido...
-[LSTM Init] Criando tensores de estado...
-[LSTM Init] Inicializando pesos...
-  - Embedding: [20000 x 128]
-    [Embedding] Limite ultra-conservador: 1,7265E-004
-    [Embedding] Stats: mean=-6,3840E-008, std=9,9672E-005, zeros=0
-  - LSTM Gates: [128 x 196] e [196 x 196]
-    [InputForget] Stats: mean=-2,0131E-004, std=7,8614E-002, zeros=0
-    [HiddenForget] Stats: mean=8,8195E-004, std=7,1552E-002, zeros=0
-    [InputInput] Stats: mean=2,9440E-004, std=7,8811E-002, zeros=0
-    [HiddenInput] Stats: mean=1,5750E-005, std=7,1525E-002, zeros=0
-    [InputCell] Stats: mean=1,7084E-004, std=7,8485E-002, zeros=0
-    [HiddenCell] Stats: mean=-1,5700E-004, std=7,1450E-002, zeros=0
-    [InputOutput] Stats: mean=1,6886E-004, std=7,8366E-002, zeros=0
-    [HiddenOutput] Stats: mean=5,0049E-004, std=7,1360E-002, zeros=0
-  - Biases: [1 x 196]
-    [BiasForget] Stats: mean=3,1104E-003, std=1,0244E-001, zeros=0
-    [BiasInput] Stats: mean=-4,9036E-003, std=1,0160E-001, zeros=0
-    [BiasCell] Stats: mean=-4,1404E-003, std=9,7280E-002, zeros=0
-    [BiasOutput] Stats: mean=7,0408E-003, std=1,0183E-001, zeros=0
-  - Output Layer: [196 x 20000]
-    [OutputWeights] Limite ultra-conservador: 1,7236E-004
-    [OutputWeights] Stats: mean=-1,0207E-007, std=9,9525E-005, zeros=0
-    [OutputBias] Limite ultra-conservador: 1,7320E-004
-    [OutputBias] Stats: mean=-3,4499E-007, std=1,0011E-004, zeros=0
-[LSTM Init] Inicialização de pesos concluída.
-[LSTM Init] Validando todos os pesos...
-  ✓ [weightsEmbedding] Válido (2560000 valores)
-  ✓ [weightsInputForget] Válido (25088 valores)
-  ✓ [weightsHiddenForget] Válido (38416 valores)
-  ✓ [weightsInputInput] Válido (25088 valores)
-  ✓ [weightsHiddenInput] Válido (38416 valores)
-  ✓ [weightsInputCell] Válido (25088 valores)
-  ✓ [weightsHiddenCell] Válido (38416 valores)
-  ✓ [weightsInputOutput] Válido (25088 valores)
-  ✓ [weightsHiddenOutput] Válido (38416 valores)
-  ✓ [biasForget] Válido (196 valores)
-  ✓ [biasInput] Válido (196 valores)
-  ✓ [biasCell] Válido (196 valores)
-  ✓ [biasOutput] Válido (196 valores)
-  ✓ [weightsHiddenOutputFinal] Válido (3920000 valores)
-  ✓ [biasOutputFinal] Válido (20000 valores)
-[LSTM Init] ✓ Todos os pesos validados com sucesso!
-[DiskOnlyCache] Inicializado. Dados: /home/mplopes/Documentos/Dayson.Node/Galileu.Node/Dayson/lstm_cache_data_0230a7e9-69d7-4e57-bc50-3880f4075c4d.bin
-[DiskOnlyCache] Política: Metadados em disco. Índice: /home/mplopes/Documentos/Dayson.Node/Galileu.Node/Dayson/lstm_cache_index_0230a7e9-69d7-4e57-bc50-3880f4075c4d.bin
-[VocabularyManager] Vocabulário carregado: 20000 tokens
-[VocabularyManager] Vocabulário válido encontrado e carregado de 'vocab.txt'. Pulando construção.
-
-[LSTM Sanity Check] Executando teste de operação básica...
-  [1/7] Testando lookup de embedding...
-  ✓ Lookup OK (sample: [0,0001, -0,0001, -0,0001, 0,0000, -0,0001...])
-  [2/7] Testando multiplicação de matriz...
-  ✓ MatMul OK (sample: [0,0320, 0,0226, 0,0320, 0,1203, 0,0830...])
-  [3/7] Testando sigmoid...
-  ✓ Sigmoid OK: [0,0000, 0,2689, 0,5000, 0,7311, 1,0000]
-  [4/7] Testando softmax...
-  ✓ Softmax OK: [0,0117, 0,0317, 0,0861, 0,2341, 0,6364] (sum=1,0000)
-  [5/7] Testando conversão float↔double...
-  ✓ Conversão OK: [1,00E-010, 5,00E-001, 1,00E+000, 1,00E+002, 1,00E+010, -1,00E-010, -5,00E-001, -1,00E+002]
-  [6/7] Testando Add e AddBroadcast...
-  ✓ Add OK: [1,10, 2,20, 3,30, 4,40]
-  ✓ AddBroadcast OK: [1,10, 2,20, 3,30, 4,10, 5,20, 6,30]
-  [7/7] Testando forward pass completo...
-  ✓ Forward OK (sample output: [0,0001, 0,0001, 0,0000, 0,0001, 0,0000...])
-  ✓ Output sum: 1,000000
-  [EXTRA] Testando lookup com múltiplos tokens...
-  ✓ Lookup testado para tokens: [0, 1, 100, 1000, 10000, 19999]
-
-[LSTM Sanity Check] ✓✓✓ TODOS OS TESTES PASSARAM ✓✓✓
-
-
-[GenerativeService] Iniciando treinamento HÍBRIDO CONTÍNUO com professor de IA...
-
-================================================================================
-INICIANDO PROCESSO DE TREINAMENTO HÍBRIDO CONTÍNUO
-  - Total de Épocas: 100
-  - Épocas de Destilação (SFT): 5
-  - Épocas de Reforço (RLAIF): 95
-================================================================================
-[Teacher] Gerando dados: Processando lote 1/245. Descartados: 0...[Teacher] Gerando dados: Processando lote 2/245. Descartados: 27...[Teacher] Gerando dados: Processando lote 3/245. Descartados: 30...[Teacher] Gerando dados: Processando lote 4/245. Descartados: 38...[Teacher] Gerando dados: Processando lote 5/245. Descartados: 50...[Teacher] Gerando dados: Processando lote 6/245. Descartados: 59...[Teacher] Gerando dados: Processando lote 7/245. Descartados: 60...[Teacher] Gerando dados: Processando lote 8/245. Descartados: 63...[Teacher] Gerando dados: Processando lote 9/245. Descartados: 63...[Teacher] Gerando dados: Processando lote 10/245. Descartados: 68...[Teacher] Gerando dados: Processando lote 11/245. Descartados: 78...[Teacher] Gerando dados: Processando lote 12/245. Descartados: 78...[Teacher] Gerando dados: Processando lote 13/245. Descartados: 93...[Teacher] Gerando dados: Processando lote 14/245. Descartados: 95...[Teacher] Gerando dados: Processando lote 15/245. Descartados: 106...[Teacher] Gerando dados: Processando lote 16/245. Descartados: 106...[Teacher] Gerando dados: Processando lote 17/245. Descartados: 106...[Teacher] Gerando dados: Processando lote 18/245. Descartados: 106...[Teacher] Gerando dados: Processando lote 19/245. Descartados: 108...
-[Teacher] AVISO: Falha ao parsear JSON. Erro: 'p' is invalid after a property name. Expected a ':'. Path: $[131] | LineNumber: 528 | BytePositionInLine: 6.
-[Teacher] Gerando dados: Processando lote 20/245. Descartados: 268...[Teacher] Gerando dados: Processando lote 21/245. Descartados: 274...[Teacher] Gerando dados: Processando lote 22/245. Descartados: 278...[Teacher] Gerando dados: Processando lote 23/245. Descartados: 279...[Teacher] Gerando dados: Processando lote 24/245. Descartados: 293...[Teacher] Gerando dados: Processando lote 25/245. Descartados: 295...[Teacher] Gerando dados: Processando lote 26/245. Descartados: 296...[Teacher] Gerando dados: Processando lote 27/245. Descartados: 303...[Teacher] Gerando dados: Processando lote 28/245. Descartados: 303...

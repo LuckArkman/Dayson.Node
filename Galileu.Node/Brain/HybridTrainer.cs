@@ -4,7 +4,10 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
+using Galileu.Node.Data;
+using MongoDB.Bson;
 
 namespace Galileu.Node.Brain;
 
@@ -40,16 +43,62 @@ public class HybridTrainer
         Console.WriteLine($"  - Épocas de Reforço (RLAIF): {totalEpochs - sftEpochs}");
         Console.WriteLine(new string('=', 80));
 
-        // --- PREPARAÇÃO INICIAL ---
+        // --- PREPARAÇÃO INICIAL E VERIFICAÇÃO DE CACHE SFT (JSON) ---
         var vocabulary = initialModel.VocabularyManager.Vocab.Keys;
-        var syntheticData = await _teacherService.GenerateSyntheticDataAsync(vocabulary);
+        string sftCacheFilePath = Path.Combine(Environment.CurrentDirectory, "Dayson", "sft_synthetic_dataset.json");
+        List<(string input, string output)> syntheticData;
+
+        if (File.Exists(sftCacheFilePath) && new FileInfo(sftCacheFilePath).Length > 0)
+        {
+            Console.WriteLine($"[HybridTrainer] Dataset SFT (JSON) encontrado em disco. Carregando...");
+            
+            try
+            {
+                var jsonString = await File.ReadAllTextAsync(sftCacheFilePath);
+                
+                // Desserializa a lista de GeneratedExample (formato MongoDB/Cache)
+                var cachedData = JsonSerializer.Deserialize<List<GeneratedExample>>(jsonString);
+                
+                // Converte de volta para a estrutura de tupla (input, output) para uso interno
+                syntheticData = cachedData?.Select(c => (c.Input, c.Output)).ToList() 
+                                ?? new List<(string, string)>();
+            }
+            catch (Exception ex) when (ex is JsonException || ex is IOException)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"[HybridTrainer] ERRO ao ler cache JSON: {ex.Message}. Forçando regeração.");
+                Console.ResetColor();
+                syntheticData = new List<(string, string)>(); // Força a regeração
+            }
+            
+            Console.WriteLine($"[HybridTrainer] {syntheticData.Count} exemplos carregados do cache local.");
+        }
+        else
+        {
+            // Lógica de Geração via Teacher Model
+            Console.WriteLine("[HybridTrainer] Dataset SFT não encontrado. Gerando via Teacher Model (API)...");
+            
+            syntheticData = await _teacherService.GenerateSyntheticDataAsync(vocabulary);
+
+            // Salva os dados gerados em formato JSON (GeneratedExample)
+            var dataToSerialize = syntheticData.Select(p => 
+                new GeneratedExample(ObjectId.GenerateNewId(), p.input, p.output, DateTime.UtcNow)).ToList();
+            var jsonString = JsonSerializer.Serialize(dataToSerialize, new JsonSerializerOptions { WriteIndented = true });
+            
+            await File.WriteAllTextAsync(sftCacheFilePath, jsonString);
+            Console.WriteLine($"[HybridTrainer] Dataset sintético para SFT gerado e salvo em: {sftCacheFilePath}");
+        }
+
         if (syntheticData.Count == 0)
         {
             throw new InvalidOperationException("Falha ao gerar o dataset sintético. O treinamento não pode continuar.");
         }
-        string sftDatasetPath = Path.Combine(Environment.CurrentDirectory, "Dayson", "sft_synthetic_dataset.txt");
-        await File.WriteAllLinesAsync(sftDatasetPath, syntheticData.Select(p => $"{p.input}\n{p.output}"));
-        Console.WriteLine($"[HybridTrainer] Dataset sintético para SFT gerado com {syntheticData.Count} exemplos.");
+        
+        // CRÍTICO: Cria o arquivo de dataset plano que o ModelTrainerLSTM espera
+        string sftDatasetPath = Path.Combine(Environment.CurrentDirectory, "Dayson", "sft_synthetic_dataset_flat.txt");
+        await File.WriteAllLinesAsync(sftDatasetPath, syntheticData.SelectMany(p => new[] { p.input, p.output }));
+        Console.WriteLine($"[HybridTrainer] Dataset sintético pronto com {syntheticData.Count} exemplos.");
+
 
         const double QUALITY_THRESHOLD = 0.6; 
         const double PERFORMANCE_CHECKPOINT_THRESHOLD = 0.7; 
@@ -73,7 +122,7 @@ public class HybridTrainer
                 var sftTrainer = new ModelTrainerLSTM(_mathEngine);
                 
                 sftTrainer.TrainModel(
-                    currentModel, sftDatasetPath, finalModelPath, learningRate, 1, 
+                    currentModel, sftDatasetPath, finalModelPath, learningRate, 1, // Usa o arquivo plano
                     batchSize, 5, validationSplit
                 );
 
@@ -103,8 +152,11 @@ public class HybridTrainer
                     Console.Write($"\rProcessando prompt {i + 1}/{prompts.Count}...");
 
                     string candidateResponse = currentModel.GenerateResponse(prompt, maxLength: 30);
-                    string referenceResponse = await _teacherService.CallApiAsync($"Responda de forma concisa e precisa: {prompt}");
-                    if (string.IsNullOrEmpty(referenceResponse)) continue;
+                    
+                    // NOVO: Usa GetReferenceResponseAsync, que inclui cache MongoDB e fallback
+                    string referenceResponse = await _teacherService.GetReferenceResponseAsync($"Responda de forma concisa e precisa: {prompt}", new HashSet<string>(vocabulary));
+                    
+                    if (string.IsNullOrEmpty(referenceResponse) || referenceResponse == "não sei") continue;
 
                     double cosineSimilarity = TextMetricsCalculator.CalculateCosineSimilarity(
                         candidateResponse, referenceResponse, currentModel.VocabularyManager.Vocab, currentModel.weightsEmbedding!

@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using MongoDB.Bson;
 
 namespace Galileu.Node.Data;
@@ -11,6 +12,7 @@ public class GeneratedExample
     public ObjectId Id { get; set; }
     public string Input { get; set; }
     public string Output { get; set; }
+    [JsonConverter(typeof(MongoDateConverter))]
     public DateTime CreatedAt { get; set; }
 
     public GeneratedExample(ObjectId id, string input, string output, DateTime createdAt)

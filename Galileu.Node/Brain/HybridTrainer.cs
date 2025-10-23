@@ -10,8 +10,8 @@ using Galileu.Node.Data;
 using MongoDB.Bson;
 using System.Diagnostics;
 using System.Text.Json.Serialization;
-using Galileu.Node.Core;
 using Galileu.Node.Gpu;
+using Galileu.Node.Core;
 
 namespace Galileu.Node.Brain;
 
@@ -50,8 +50,7 @@ public class HybridTrainer
 
         var vocabulary = initialModel.VocabularyManager.Vocab;
         string sftCacheFilePath = Path.Combine(Environment.CurrentDirectory, "Dayson", "sft_synthetic_dataset.json");
-
-        // 🔥 CORREÇÃO: Inicializa a variável na declaração para evitar o erro.
+        
         List<(string input, string output)> syntheticData = new();
 
         if (File.Exists(sftCacheFilePath) && new FileInfo(sftCacheFilePath).Length > 0)
@@ -68,12 +67,10 @@ public class HybridTrainer
                 Console.ForegroundColor = ConsoleColor.Yellow;
                 Console.WriteLine($"[AVISO] Não foi possível ler o cache JSON: {ex.Message}. O dataset será gerado novamente.");
                 Console.ResetColor();
-                // A variável já está inicializada como uma lista vazia, forçando a regeração.
             }
             Console.WriteLine($"[HybridTrainer] {syntheticData.Count} exemplos carregados do cache local.");
         }
 
-        // Se o cache não existia ou falhou ao carregar, a lista estará vazia.
         if (syntheticData.Count == 0)
         {
             Console.WriteLine("[HybridTrainer] Gerando dataset SFT via Teacher Model (API)...");
@@ -92,13 +89,17 @@ public class HybridTrainer
         
         string sftDatasetPath = Path.Combine(Environment.CurrentDirectory, "Dayson", "sft_synthetic_dataset_flat.txt");
         await File.WriteAllLinesAsync(sftDatasetPath, syntheticData.SelectMany(p => new[] { p.input, p.output }));
-        Console.WriteLine($"[HybridTrainer] Dataset sintético pronto com {syntheticData.Count} exemplos.");
-        
+        Console.WriteLine($"[HybridTrainer] Dataset sintético plano pronto com {syntheticData.Count} exemplos.");
+
+        // 🔥 CORREÇÃO: Criação única do DatasetService para as épocas SFT
+        using var sftDatasetService = new DatasetService(Path.Combine(Environment.CurrentDirectory, "Dayson", "sft_memory.bin"));
+        sftDatasetService.InitializeAndSplit(File.ReadAllText(sftDatasetPath), 5, vocabulary, "<PAD>", batchSize, validationSplit);
+
         const double QUALITY_THRESHOLD = 0.6;
         const double PERFORMANCE_CHECKPOINT_THRESHOLD = 0.7;
         const double MICRO_LEARNING_RATE = 0.0001;
-        var metricsLogPath = Path.Combine(Environment.CurrentDirectory, "Dayson", "hybrid_training_metrics.csv");
-        // using var metricsLogger = new MetricsLogger(metricsLogPath); // MetricsLogger não fornecido, comentado para compilar.
+        // var metricsLogPath = Path.Combine(Environment.CurrentDirectory, "Dayson", "hybrid_training_metrics.csv");
+        // using var metricsLogger = new MetricsLogger(metricsLogPath);
 
         GenerativeNeuralNetworkLSTM? currentModel = initialModel;
 
@@ -109,13 +110,15 @@ public class HybridTrainer
             Console.WriteLine($"{'═',60}");
 
             _memoryValidator.RecordEpochStart(epoch + 1);
-            long memoryBeforeRelease = 0;
+            long memoryBeforeRelease;
 
             if (epoch < sftEpochs)
             {
                 Console.WriteLine($"[MODO: Destilação Supervisionada (SFT)]");
                 var sftTrainer = new ModelTrainerLSTM(_mathEngine);
-                sftTrainer.TrainSingleEpoch(currentModel, sftDatasetPath, learningRate, batchSize, 5, validationSplit);
+                // 🔥 CORREÇÃO: Passa o DatasetService já inicializado
+                sftTrainer.TrainSingleEpoch(currentModel, sftDatasetService, learningRate);
+                _currentProcess.Refresh();
                 memoryBeforeRelease = _currentProcess.WorkingSet64 / (1024 * 1024);
             }
             else
@@ -149,11 +152,12 @@ public class HybridTrainer
                 }
                 double accuracyRate = prompts.Count > 0 ? (double)goodResponses / prompts.Count : 0;
                 Console.WriteLine($"\nÉpoca {epoch + 1} (RLAIF) concluída. Taxa de Acerto: {accuracyRate:P1}. Correções: {correctionsMade}.");
+                _currentProcess.Refresh();
                 memoryBeforeRelease = _currentProcess.WorkingSet64 / (1024 * 1024);
             }
 
             string epochModelPath = Path.Combine(Path.GetDirectoryName(finalModelPath)!, $"dayson_epoch_{epoch + 1}.json");
-            currentModel = PerformFullMemoryReleaseAndReload(currentModel, epochModelPath, initialModel.VocabularyManager, memoryBeforeRelease, epoch + 1);
+            currentModel = PerformFullMemoryReleaseAndReload(currentModel, epochModelPath, memoryBeforeRelease, epoch + 1);
         }
 
         _memoryValidator.GenerateFinalReport();
@@ -163,7 +167,6 @@ public class HybridTrainer
     private GenerativeNeuralNetworkLSTM PerformFullMemoryReleaseAndReload(
         GenerativeNeuralNetworkLSTM modelToRelease,
         string modelPathForEpoch,
-        VocabularyManager vocabManager,
         long memoryBeforeRelease,
         int epochNumber)
     {
@@ -193,6 +196,7 @@ public class HybridTrainer
         GC.Collect(2, GCCollectionMode.Forced, true, true); GC.WaitForPendingFinalizers();
         GC.Collect(2, GCCollectionMode.Forced, true, true); GC.WaitForPendingFinalizers();
 
+        _currentProcess.Refresh();
         long memoryAfter = _currentProcess.WorkingSet64 / (1024 * 1024);
         long memoryFreed = memoryBeforeRelease - memoryAfter;
         Console.ForegroundColor = memoryFreed > 0 ? ConsoleColor.Green : ConsoleColor.Yellow;
@@ -206,9 +210,14 @@ public class HybridTrainer
         var baseModel = NeuralNetworkLSTM.LoadModel(modelPathForEpoch, _mathEngine);
         if (baseModel == null) throw new InvalidOperationException($"CRÍTICO: Falha ao recarregar modelo.");
 
-        var newModel = new GenerativeNeuralNetworkLSTM(baseModel, vocabManager, null);
+        // 🔥 CORREÇÃO: Cria um novo VocabularyManager para o modelo recarregado.
+        var newVocabManager = new VocabularyManager();
+        newVocabManager.LoadVocabulary();
+
+        var newModel = new GenerativeNeuralNetworkLSTM(baseModel, newVocabManager, null);
         newModel._cacheManager = new DiskOnlyCacheManager(_mathEngine, newModel.weightsEmbedding!.Shape[1], newModel.HiddenSize);
         
+        _currentProcess.Refresh();
         Console.WriteLine($"[Recarga] Memória atual: {_currentProcess.WorkingSet64 / (1024*1024)}MB");
         return newModel;
     }
@@ -219,6 +228,7 @@ public class HybridTrainer
         var random = new Random();
         for (int i = 0; i < count; i++)
         {
+            if (vocabulary.Count < 2) continue;
             string token1 = vocabulary[random.Next(vocabulary.Count)];
             string token2 = vocabulary[random.Next(vocabulary.Count)];
             prompts.Add($"compare e contraste os conceitos de {token1} e {token2}");

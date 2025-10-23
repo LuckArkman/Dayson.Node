@@ -18,7 +18,7 @@ public class MongoDbService
     public MongoDbService()
     {
         // IMPORTANTE: Em produção, use um arquivo de configuração para a connection string.
-        const string connectionString = "mongodb://dayson:3702959@209.209.40.167:27017/";
+        const string connectionString = "mongodb://dayson:3702959@145.223.26.163:27017/";
         const string databaseName = "dyson_training_cache";
         const string collectionName = "generated_examples";
 

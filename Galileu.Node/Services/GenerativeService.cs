@@ -10,6 +10,10 @@ using System.Threading.Tasks;
 
 namespace Galileu.Node.Services;
 
+/// <summary>
+/// Ponto de entrada para as operações de treinamento e geração.
+/// Delega a lógica de treinamento complexa para os trainers especializados (HybridTrainer).
+/// </summary>
 public class GenerativeService
 {
     private readonly string _modelPath = Path.Combine(Environment.CurrentDirectory, "Dayson", "Dayson.json");
@@ -36,61 +40,19 @@ public class GenerativeService
         }
     }
 
+    /// <summary>
+    /// Ponto de entrada para o treinamento padrão (agora obsoleto, redireciona para o híbrido).
+    /// </summary>
     public async Task TrainModelAsync(Trainer trainerOptions)
     {
-        if (!File.Exists(trainerOptions.datasetPath))
-        {
-            throw new FileNotFoundException($"Arquivo de dataset não encontrado em: {trainerOptions.datasetPath}");
-        }
-
-        await Task.Run(() =>
-        {
-            const int VOCAB_SIZE = 20000;
-            const int EMBEDDING_SIZE = 128;
-            const int HIDDEN_SIZE = 256;
-            const int CONTEXT_WINDOW = 5;
-
-            GenerativeNeuralNetworkLSTM? initialModel = null;
-            try
-            {
-                Console.WriteLine("[GenerativeService] Inicializando modelo LSTM para treinamento padrão...");
-                initialModel = new GenerativeNeuralNetworkLSTM(
-                    VOCAB_SIZE, EMBEDDING_SIZE, HIDDEN_SIZE,
-                    trainerOptions.datasetPath, _searchService, _mathEngine
-                );
-                initialModel._cacheManager = new DiskOnlyCacheManager(_mathEngine, EMBEDDING_SIZE, HIDDEN_SIZE);
-                initialModel.RunSanityCheck();
-
-                var trainer = new ModelTrainerLSTM(_mathEngine);
-                Console.WriteLine("\n[GenerativeService] Iniciando treinamento com liberação total de memória...");
-
-                trainer.TrainModel(
-                    initialModel, trainerOptions.datasetPath, _modelPath, trainerOptions.learningRate,
-                    trainerOptions.epochs, trainerOptions.batchSize, CONTEXT_WINDOW, trainerOptions.validationSplit
-                );
-
-                Console.WriteLine($"\n[GenerativeService] Treinamento concluído! Carregando modelo final...");
-                string lastEpochModelPath = Path.Combine(Path.GetDirectoryName(_modelPath)!, $"dayson_{trainerOptions.epochs}.json");
-                if (File.Exists(lastEpochModelPath))
-                {
-                    File.Copy(lastEpochModelPath, _modelPath, overwrite: true);
-                }
-                InitializeFromDisk();
-                initialModel = null;
-                ForceAggressiveGarbageCollection();
-                Console.WriteLine("[GenerativeService] Serviço pronto para inferência!");
-            }
-            catch (Exception ex)
-            {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"\n[ERRO CRÍTICO] Falha no treinamento: {ex.Message}\nStack Trace: {ex.StackTrace}");
-                Console.ResetColor();
-                initialModel?.Dispose();
-                throw;
-            }
-        });
+        // Redireciona para o fluxo de treinamento híbrido, que é o padrão agora.
+        Console.WriteLine("[GenerativeService] O treinamento padrão foi invocado, redirecionando para o fluxo de Treinamento Híbrido.");
+        await TrainWithTeacherAsync(trainerOptions);
     }
 
+    /// <summary>
+    /// Inicia o processo de treinamento híbrido de longo prazo.
+    /// </summary>
     public async Task TrainWithTeacherAsync(Trainer trainerOptions)
     {
         if (!File.Exists(trainerOptions.datasetPath))
@@ -98,6 +60,7 @@ public class GenerativeService
             throw new FileNotFoundException($"Arquivo de dataset não encontrado em: {trainerOptions.datasetPath}");
         }
 
+        // Executa o treinamento em uma thread de background para não bloquear a API.
         await Task.Run(async () =>
         {
             const int VOCAB_SIZE = 20000;
@@ -119,51 +82,69 @@ public class GenerativeService
 
                 Console.WriteLine("\n[GenerativeService] Iniciando treinamento HÍBRIDO CONTÍNUO com professor de IA...");
 
+                // Delega toda a lógica de treinamento para o HybridTrainer.
                 await hybridTrainer.TrainModelAsync(
                     initialModel,
                     _modelPath,
                     trainerOptions.learningRate,
                     totalEpochs: trainerOptions.epochs,
-                    sftEpochs: 5, // As 5 primeiras épocas serão de destilação
+                    sftEpochs: 5, // As 5 primeiras épocas serão de destilação.
                     trainerOptions.batchSize,
                     trainerOptions.validationSplit
                 );
 
-                Console.WriteLine($"\n[GenerativeService] Treinamento híbrido concluído! Carregando modelo final...");
+                Console.WriteLine($"\n[GenerativeService] Treinamento híbrido concluído! Carregando o modelo mais recente para inferência...");
+                
+                // Carrega o modelo da última época salva pelo HybridTrainer.
+                string lastEpochModelPath = Path.Combine(Path.GetDirectoryName(_modelPath)!, $"dayson_epoch_{trainerOptions.epochs}.json");
+                if (File.Exists(lastEpochModelPath))
+                {
+                     // Copia para o caminho padrão "Dayson.json" para inferência.
+                    File.Copy(lastEpochModelPath, _modelPath, overwrite: true);
+                }
+
                 InitializeFromDisk();
                 
-                initialModel = null;
+                initialModel = null; // A instância inicial já foi descartada pelo HybridTrainer.
                 ForceAggressiveGarbageCollection();
-                Console.WriteLine("[GenerativeService] Serviço pronto para inferência com modelo treinado por professor!");
+                Console.WriteLine("[GenerativeService] Serviço pronto para inferência com o modelo final treinado.");
             }
             catch (Exception ex)
             {
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"\n[ERRO CRÍTICO] Falha no treinamento híbrido: {ex.Message}\nStack Trace: {ex.StackTrace}");
+                Console.WriteLine($"\n[ERRO CRÍTICO] Falha no processo de treinamento híbrido: {ex.Message}\nStack Trace: {ex.StackTrace}");
                 Console.ResetColor();
-                initialModel?.Dispose();
-                throw;
+                initialModel?.Dispose(); // Garante a limpeza em caso de falha na inicialização.
+                throw; // Re-lança a exceção para que o chamador (API) saiba da falha.
             }
         });
     }
 
+    /// <summary>
+    /// Gera uma resposta de texto a partir de um prompt.
+    /// </summary>
     public async Task<string?> GenerateAsync(GenerateResponse generateResponse)
     {
-        if (_model == null) return "Erro: O modelo não está carregado.";
+        if (_model == null) return "Erro: O modelo não está carregado. Treine ou carregue um modelo primeiro.";
         return await Task.Run(() => _model.GenerateResponse(generateResponse.input, maxLength: 50));
     }
 
+    /// <summary>
+    /// Carrega o modelo a partir do caminho padrão em disco.
+    /// </summary>
     public void InitializeFromDisk()
     {
         if (!File.Exists(_modelPath))
         {
-            Console.WriteLine($"[GenerativeService] Modelo não encontrado em {_modelPath}");
+            Console.WriteLine($"[GenerativeService] Modelo não encontrado em {_modelPath}. Nenhuma ação realizada.");
             return;
         }
         try
         {
-            Console.WriteLine($"[GenerativeService] Carregando modelo de {_modelPath}...");
+            Console.WriteLine($"[GenerativeService] Carregando modelo de {_modelPath} para inferência...");
+            _model?.Dispose(); // Descarta qualquer modelo antigo em memória.
             _model = ModelSerializerLSTM.LoadModel(_modelPath, _mathEngine);
+            
             if (_model != null)
             {
                 Console.WriteLine("[GenerativeService] Modelo carregado com sucesso!");
@@ -175,7 +156,10 @@ public class GenerativeService
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[GenerativeService] Erro ao carregar modelo: {ex.Message}");
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine($"[GenerativeService] ERRO ao carregar modelo de disco: {ex.Message}");
+            Console.ResetColor();
+            _model = null;
         }
     }
 
@@ -184,5 +168,6 @@ public class GenerativeService
         GC.Collect(2, GCCollectionMode.Forced, true, true);
         GC.WaitForPendingFinalizers();
         GC.Collect(2, GCCollectionMode.Forced, true, true);
+        GC.WaitForPendingFinalizers();
     }
 }

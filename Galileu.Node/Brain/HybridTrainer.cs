@@ -10,6 +10,7 @@ using Galileu.Node.Core;
 using System.Diagnostics;
 using Galileu.Node.Gpu;
 using System.Text.Json.Serialization;
+using Galileu.Node.Data;
 
 namespace Galileu.Node.Brain;
 
@@ -57,7 +58,7 @@ public class HybridTrainer
 
         var vocabManager = initialModel.VocabularyManager;
         var vocabulary = vocabManager.Vocab;
-        string sftCacheFilePath = Path.Combine(Environment.CurrentDirectory, "Dayson", "sft_synthetic_dataset_tokenized.json");
+        string sftCacheFilePath = Path.Combine(Environment.CurrentDirectory, "Dayson", "sft_synthetic_dataset.json");
         
         List<(int InputIndex, int TargetIndex)> allSamples = new();
 
@@ -67,13 +68,13 @@ public class HybridTrainer
             try
             {
                 var jsonString = await File.ReadAllTextAsync(sftCacheFilePath);
-                var tokenizedData = JsonSerializer.Deserialize<List<SftSampleTokenizedCache>>(jsonString);
+                var tokenizedData = JsonSerializer.Deserialize<List<GeneratedExample>>(jsonString);
                 
                 if (tokenizedData != null)
                 {
                     foreach(var sample in tokenizedData)
                     {
-                        var sequence = sample.InputIds.Concat(sample.OutputIds).ToArray();
+                        var sequence = sample.Input.Concat(sample.Output).ToArray();
                         if (sequence.Length < 2) continue;
                         for (int i = 0; i < sequence.Length - 1; i++)
                         {

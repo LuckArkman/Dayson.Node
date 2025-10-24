@@ -6,18 +6,25 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Text.Json;
-using Galileu.Node.Data;
-using MongoDB.Bson;
-using System.Diagnostics;
-using System.Text.Json.Serialization;
-using Galileu.Node.Gpu;
 using Galileu.Node.Core;
+using System.Diagnostics;
+using Galileu.Node.Gpu;
+using System.Text.Json.Serialization;
 
 namespace Galileu.Node.Brain;
 
 /// <summary>
-/// Orquestra um processo de treinamento híbrido e CONTÍNUO, com lógica de cache
-/// de disco e um ciclo de liberação de memória centralizado e robusto.
+/// Estrutura para o cache do dataset SFT já tokenizado, armazenando IDs em vez de texto.
+/// </summary>
+public record SftSampleTokenizedCache(
+    [property: JsonPropertyName("input_ids")] int[] InputIds,
+    [property: JsonPropertyName("output_ids")] int[] OutputIds
+);
+
+/// <summary>
+/// Orquestra o treinamento híbrido. Utiliza um cache de IDs de tokens para os dados SFT
+/// para garantir robustez e consistência, e gerencia o ciclo de vida do modelo
+/// para estabilidade de memória a longo prazo.
 /// </summary>
 public class HybridTrainer
 {
@@ -48,58 +55,87 @@ public class HybridTrainer
         Console.WriteLine($"  - Total de Épocas: {totalEpochs}, Épocas SFT: {sftEpochs}");
         Console.WriteLine(new string('=', 80));
 
-        var vocabulary = initialModel.VocabularyManager.Vocab;
-        string sftCacheFilePath = Path.Combine(Environment.CurrentDirectory, "Dayson", "sft_synthetic_dataset.json");
+        var vocabManager = initialModel.VocabularyManager;
+        var vocabulary = vocabManager.Vocab;
+        string sftCacheFilePath = Path.Combine(Environment.CurrentDirectory, "Dayson", "sft_synthetic_dataset_tokenized.json");
         
-        List<(string input, string output)> syntheticData = new();
+        List<(int InputIndex, int TargetIndex)> allSamples = new();
 
         if (File.Exists(sftCacheFilePath) && new FileInfo(sftCacheFilePath).Length > 0)
         {
-            Console.WriteLine($"[HybridTrainer] Dataset SFT (JSON) encontrado em disco. Carregando...");
+            Console.WriteLine($"[HybridTrainer] Dataset SFT TOKENIZADO encontrado em disco. Carregando...");
             try
             {
                 var jsonString = await File.ReadAllTextAsync(sftCacheFilePath);
-                var cachedData = JsonSerializer.Deserialize<List<SftSampleCache>>(jsonString);
-                syntheticData = cachedData?.Select(c => (c.Input, c.Output)).ToList() ?? new List<(string, string)>();
+                var tokenizedData = JsonSerializer.Deserialize<List<SftSampleTokenizedCache>>(jsonString);
+                
+                if (tokenizedData != null)
+                {
+                    foreach(var sample in tokenizedData)
+                    {
+                        var sequence = sample.InputIds.Concat(sample.OutputIds).ToArray();
+                        if (sequence.Length < 2) continue;
+                        for (int i = 0; i < sequence.Length - 1; i++)
+                        {
+                            allSamples.Add((sequence[i], sequence[i+1]));
+                        }
+                    }
+                }
             }
-            catch (Exception ex) when (ex is JsonException || ex is IOException)
+            catch (Exception ex)
             {
                 Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine($"[AVISO] Não foi possível ler o cache JSON: {ex.Message}. O dataset será gerado novamente.");
-                Console.ResetColor();
+                Console.WriteLine($"[AVISO] Falha ao carregar cache tokenizado: {ex.Message}. Gerando novamente.");
+                allSamples.Clear();
             }
-            Console.WriteLine($"[HybridTrainer] {syntheticData.Count} exemplos carregados do cache local.");
+            Console.WriteLine($"[HybridTrainer] {allSamples.Count} amostras de treinamento geradas do cache.");
         }
 
-        if (syntheticData.Count == 0)
+        if (allSamples.Count == 0)
         {
-            Console.WriteLine("[HybridTrainer] Gerando dataset SFT via Teacher Model (API)...");
-            syntheticData = await _teacherService.GenerateSyntheticDataAsync(vocabulary.Keys);
+            Console.WriteLine("[HybridTrainer] Gerando e tokenizando dataset SFT via Teacher Model...");
+            var syntheticDataText = await _teacherService.GenerateSyntheticDataAsync(vocabulary.Keys);
+            
+            var tokenizedDataToCache = new List<SftSampleTokenizedCache>();
+            int unkIndex = vocabulary["<UNK>"];
 
-            var dataToSerialize = syntheticData.Select(p => new SftSampleCache(p.input, p.output)).ToList();
-            var jsonString = JsonSerializer.Serialize(dataToSerialize, new JsonSerializerOptions { WriteIndented = true });
+            foreach (var pair in syntheticDataText)
+            {
+                var inputTokens = vocabManager.Tokenize(pair.input);
+                var outputTokens = vocabManager.Tokenize(pair.output);
+
+                var inputIds = inputTokens.Select(t => vocabulary.TryGetValue(t, out int id) ? id : unkIndex).ToArray();
+                var outputIds = outputTokens.Select(t => vocabulary.TryGetValue(t, out int id) ? id : unkIndex).ToArray();
+                
+                tokenizedDataToCache.Add(new SftSampleTokenizedCache(inputIds, outputIds));
+
+                var sequence = inputIds.Concat(outputIds).ToArray();
+                if (sequence.Length < 2) continue;
+                for (int i = 0; i < sequence.Length - 1; i++)
+                {
+                    allSamples.Add((sequence[i], sequence[i+1]));
+                }
+            }
+            
+            var jsonString = JsonSerializer.Serialize(tokenizedDataToCache, new JsonSerializerOptions { WriteIndented = true });
             await File.WriteAllTextAsync(sftCacheFilePath, jsonString);
-            Console.WriteLine($"[HybridTrainer] Dataset sintético para SFT gerado e salvo em: {sftCacheFilePath}");
+            Console.WriteLine($"[HybridTrainer] Dataset tokenizado e salvo em: {Path.GetFileName(sftCacheFilePath)}");
         }
 
-        if (syntheticData.Count == 0)
+        if (allSamples.Count == 0)
         {
-            throw new InvalidOperationException("Falha ao gerar ou carregar o dataset sintético. O treinamento não pode continuar.");
+             throw new InvalidOperationException("Nenhuma amostra de treinamento foi gerada. O treinamento não pode continuar.");
         }
+
+        var rnd = new Random(42);
+        allSamples = allSamples.OrderBy(x => rnd.Next()).ToList();
+        int validationCount = (int)(allSamples.Count * validationSplit);
+        var validationSamples = allSamples.Take(validationCount).ToList();
+        var trainingSamples = allSamples.Skip(validationCount).ToList();
         
-        string sftDatasetPath = Path.Combine(Environment.CurrentDirectory, "Dayson", "sft_synthetic_dataset_flat.txt");
-        await File.WriteAllLinesAsync(sftDatasetPath, syntheticData.SelectMany(p => new[] { p.input, p.output }));
-        Console.WriteLine($"[HybridTrainer] Dataset sintético plano pronto com {syntheticData.Count} exemplos.");
-
-        // 🔥 CORREÇÃO: Criação única do DatasetService para as épocas SFT
-        using var sftDatasetService = new DatasetService(Path.Combine(Environment.CurrentDirectory, "Dayson", "sft_memory.bin"));
-        sftDatasetService.InitializeAndSplit(File.ReadAllText(sftDatasetPath), 5, vocabulary, "<PAD>", batchSize, validationSplit);
-
         const double QUALITY_THRESHOLD = 0.6;
         const double PERFORMANCE_CHECKPOINT_THRESHOLD = 0.7;
         const double MICRO_LEARNING_RATE = 0.0001;
-        // var metricsLogPath = Path.Combine(Environment.CurrentDirectory, "Dayson", "hybrid_training_metrics.csv");
-        // using var metricsLogger = new MetricsLogger(metricsLogPath);
 
         GenerativeNeuralNetworkLSTM? currentModel = initialModel;
 
@@ -116,8 +152,7 @@ public class HybridTrainer
             {
                 Console.WriteLine($"[MODO: Destilação Supervisionada (SFT)]");
                 var sftTrainer = new ModelTrainerLSTM(_mathEngine);
-                // 🔥 CORREÇÃO: Passa o DatasetService já inicializado
-                sftTrainer.TrainSingleEpoch(currentModel, sftDatasetService, learningRate);
+                sftTrainer.TrainSingleEpoch(currentModel, trainingSamples, validationSamples, learningRate, batchSize);
                 _currentProcess.Refresh();
                 memoryBeforeRelease = _currentProcess.WorkingSet64 / (1024 * 1024);
             }
@@ -127,49 +162,52 @@ public class HybridTrainer
                 var prompts = GenerateRlaifPrompts(vocabulary.Keys.ToList(), 100);
                 int correctionsMade = 0;
                 int goodResponses = 0;
-
                 for (int i = 0; i < prompts.Count; i++)
                 {
                     var prompt = prompts[i];
                     Console.Write($"\rProcessando prompt RLAIF {i + 1}/{prompts.Count}...");
                     string candidateResponse = currentModel.GenerateResponse(prompt, maxLength: 30);
                     string referenceResponse = await _teacherService.GetReferenceResponseAsync(prompt, new HashSet<string>(vocabulary.Keys));
-                    
                     if (string.IsNullOrEmpty(referenceResponse) || referenceResponse == "não sei") continue;
-
                     double cosineSimilarity = TextMetricsCalculator.CalculateCosineSimilarity(candidateResponse, referenceResponse, vocabulary, currentModel.weightsEmbedding!);
-                    // metricsLogger.LogMetrics(...)
-                    
-                    if (cosineSimilarity < QUALITY_THRESHOLD)
-                    {
-                        correctionsMade++;
-                        currentModel.CorrectiveFineTuningStep(prompt, referenceResponse, MICRO_LEARNING_RATE);
-                    }
-                    else
-                    {
-                        goodResponses++;
-                    }
+                    if (cosineSimilarity < QUALITY_THRESHOLD) { correctionsMade++; currentModel.CorrectiveFineTuningStep(prompt, referenceResponse, MICRO_LEARNING_RATE); } else { goodResponses++; }
                 }
                 double accuracyRate = prompts.Count > 0 ? (double)goodResponses / prompts.Count : 0;
                 Console.WriteLine($"\nÉpoca {epoch + 1} (RLAIF) concluída. Taxa de Acerto: {accuracyRate:P1}. Correções: {correctionsMade}.");
+                
+                if (accuracyRate >= PERFORMANCE_CHECKPOINT_THRESHOLD)
+                {
+                    string snapshotDir = Path.Combine(Environment.CurrentDirectory, "Dayson", "snapshots");
+                    Directory.CreateDirectory(snapshotDir);
+                    string snapshotPath = Path.Combine(snapshotDir, $"model_epoch-{epoch + 1}_accuracy-{(int)(accuracyRate * 100)}pct.json");
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.WriteLine($"\n>>> PERFORMANCE ATINGIDA! Salvando snapshot em: {Path.GetFileName(snapshotPath)}");
+                    Console.ResetColor();
+                    currentModel.SaveModel(snapshotPath);
+                }
+
                 _currentProcess.Refresh();
                 memoryBeforeRelease = _currentProcess.WorkingSet64 / (1024 * 1024);
             }
 
             string epochModelPath = Path.Combine(Path.GetDirectoryName(finalModelPath)!, $"dayson_epoch_{epoch + 1}.json");
-            currentModel = PerformFullMemoryReleaseAndReload(currentModel, epochModelPath, memoryBeforeRelease, epoch + 1);
+            currentModel = PerformFullMemoryReleaseAndReload(currentModel, epochModelPath, memoryBeforeRelease, epoch + 1, totalEpochs);
+            if (currentModel == null) break;
         }
 
         _memoryValidator.GenerateFinalReport();
         Console.WriteLine("\n[HybridTrainer] Treinamento híbrido contínuo concluído com sucesso!");
     }
 
-    private GenerativeNeuralNetworkLSTM PerformFullMemoryReleaseAndReload(
-        GenerativeNeuralNetworkLSTM modelToRelease,
+    private GenerativeNeuralNetworkLSTM? PerformFullMemoryReleaseAndReload(
+        GenerativeNeuralNetworkLSTM? modelToRelease,
         string modelPathForEpoch,
         long memoryBeforeRelease,
-        int epochNumber)
+        int epochNumber,
+        int totalEpochs)
     {
+        if (modelToRelease == null) return null;
+
         Console.WriteLine($"\n╔════════════════════════════════════════════════════════════╗");
         Console.WriteLine($"║  INICIANDO LIBERAÇÃO COMPLETA DE MEMÓRIA (ÉPOCA {epochNumber})      ║");
         Console.WriteLine($"╚════════════════════════════════════════════════════════════╝");
@@ -206,20 +244,25 @@ public class HybridTrainer
 
         _memoryValidator.ValidateMemoryRelease(epochNumber);
 
-        Console.WriteLine($"\n[Passo 7/7] Recarregando modelo limpo para a próxima época...");
-        var baseModel = NeuralNetworkLSTM.LoadModel(modelPathForEpoch, _mathEngine);
-        if (baseModel == null) throw new InvalidOperationException($"CRÍTICO: Falha ao recarregar modelo.");
+        if (epochNumber < totalEpochs)
+        {
+            Console.WriteLine($"\n[Passo 7/7] Recarregando modelo limpo para a próxima época...");
+            var baseModel = NeuralNetworkLSTM.LoadModel(modelPathForEpoch, _mathEngine);
+            if (baseModel == null) throw new InvalidOperationException($"CRÍTICO: Falha ao recarregar modelo.");
 
-        // 🔥 CORREÇÃO: Cria um novo VocabularyManager para o modelo recarregado.
-        var newVocabManager = new VocabularyManager();
-        newVocabManager.LoadVocabulary();
+            var newVocabManager = new VocabularyManager();
+            newVocabManager.LoadVocabulary();
 
-        var newModel = new GenerativeNeuralNetworkLSTM(baseModel, newVocabManager, null);
-        newModel._cacheManager = new DiskOnlyCacheManager(_mathEngine, newModel.weightsEmbedding!.Shape[1], newModel.HiddenSize);
+            var newModel = new GenerativeNeuralNetworkLSTM(baseModel, newVocabManager, null);
+            newModel._cacheManager = new DiskOnlyCacheManager(_mathEngine, newModel.weightsEmbedding!.Shape[1], newModel.HiddenSize);
+            
+            _currentProcess.Refresh();
+            Console.WriteLine($"[Recarga] Memória atual: {_currentProcess.WorkingSet64 / (1024*1024)}MB");
+            return newModel;
+        }
         
-        _currentProcess.Refresh();
-        Console.WriteLine($"[Recarga] Memória atual: {_currentProcess.WorkingSet64 / (1024*1024)}MB");
-        return newModel;
+        Console.WriteLine("\n[Treinamento] Última época concluída. Não é necessário recarregar.");
+        return null;
     }
 
     private List<string> GenerateRlaifPrompts(List<string> vocabulary, int count)
@@ -229,18 +272,17 @@ public class HybridTrainer
         for (int i = 0; i < count; i++)
         {
             if (vocabulary.Count < 2) continue;
-            string token1 = vocabulary[random.Next(vocabulary.Count)];
-            string token2 = vocabulary[random.Next(vocabulary.Count)];
+            var validTokens = vocabulary.Where(v => !v.Contains('<') && !v.Contains('>') && v.Length > 2).ToList();
+            if (validTokens.Count < 2) continue;
+
+            string token1 = validTokens[random.Next(validTokens.Count)];
+            string token2 = validTokens[random.Next(validTokens.Count)];
+            while (token1 == token2)
+            {
+                token2 = validTokens[random.Next(validTokens.Count)];
+            }
             prompts.Add($"compare e contraste os conceitos de {token1} e {token2}");
         }
         return prompts;
     }
 }
-
-/// <summary>
-/// Estrutura auxiliar para serializar pares de dados de treinamento SFT no cache local JSON.
-/// </summary>
-public record SftSampleCache(
-    [property: JsonPropertyName("input")] string Input,
-    [property: JsonPropertyName("output")] string Output
-);

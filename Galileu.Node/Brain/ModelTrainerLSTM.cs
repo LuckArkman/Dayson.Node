@@ -2,6 +2,7 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Collections.Generic; // Necessário para List<>
 using Galileu.Node.Core;
 using Galileu.Node.Interfaces;
 using Galileu.Node.Services;
@@ -9,8 +10,9 @@ using Galileu.Node.Services;
 namespace Galileu.Node.Brain;
 
 /// <summary>
-/// Orquestra o processo de treinamento de um modelo GenerativeNeuralNetworkLSTM para uma única época.
-/// A lógica de gerenciamento de memória entre épocas foi centralizada no HybridTrainer.
+/// Orquestra o treinamento de uma única época. VERSÃO FINAL: Opera diretamente
+/// sobre listas de amostras em memória, eliminando a dependência do DatasetService.
+/// </summary>
 public class ModelTrainerLSTM
 {
     private readonly IMathEngine _mathEngine;
@@ -25,15 +27,15 @@ public class ModelTrainerLSTM
     }
 
     /// <summary>
-    /// Executa o treinamento e validação para uma única época, usando um DatasetService pré-configurado.
+    /// 🔥 CORREÇÃO DEFINITIVA: Executa o treinamento e validação para uma única época
+    /// usando listas de amostras pré-processadas em memória.
     /// </summary>
-    /// <param name="model">O modelo a ser treinado.</param>
-    /// <param name="datasetService">O serviço de dataset já inicializado com os dados da época.</param>
-    /// <param name="learningRate">A taxa de aprendizado para esta época.</param>
     public void TrainSingleEpoch(
         GenerativeNeuralNetworkLSTM model,
-        DatasetService datasetService,
-        double learningRate)
+        List<(int InputIndex, int TargetIndex)> trainingSamples,
+        List<(int InputIndex, int TargetIndex)> validationSamples,
+        double learningRate,
+        int batchSize)
     {
         _stopwatch.Restart();
         Console.WriteLine($"\n{'═',60}");
@@ -42,13 +44,17 @@ public class ModelTrainerLSTM
 
         double totalEpochLoss = 0;
         int batchCount = 0;
-        datasetService.ResetTrain();
-
-        // Loop de treinamento
-        while (true)
+        
+        if (trainingSamples.Count == 0)
         {
-            var batch = datasetService.GetNextTrainChunk();
-            if (batch == null || batch.Count == 0) break;
+            Console.WriteLine("[AVISO] Nenhuma amostra de treinamento fornecida para esta época.");
+        }
+
+        // Loop de treinamento sobre a lista em memória
+        for (int i = 0; i < trainingSamples.Count; i += batchSize)
+        {
+            var batch = trainingSamples.Skip(i).Take(batchSize).ToList();
+            if (batch.Count == 0) break;
 
             var sequenceInputIndices = batch.Select(p => p.InputIndex).ToArray();
             var sequenceTargetIndices = batch.Select(p => p.TargetIndex).ToArray();
@@ -56,10 +62,9 @@ public class ModelTrainerLSTM
             model.ResetHiddenState();
             totalEpochLoss += model.TrainSequence(sequenceInputIndices, sequenceTargetIndices, learningRate);
             batchCount++;
-            Console.Write($"\r  Lotes de treinamento processados: {batchCount} ...");
+            Console.Write($"\r  Lotes de treinamento processados: {batchCount} de {Math.Ceiling((double)trainingSamples.Count / batchSize)}...");
 
-            // Limpa o cache DEPOIS de processar o lote
-            model._cacheManager.Reset();
+            model._cacheManager?.Reset();
         }
 
         _stopwatch.Stop();
@@ -70,23 +75,27 @@ public class ModelTrainerLSTM
         File.AppendAllText(logPath, $"Época SFT concluída. Perda: {avgLoss}. Duração: {elapsedFormatted}{Environment.NewLine}");
 
         // Validação
-        double validationLoss = ValidateModel(model, datasetService);
+        double validationLoss = ValidateModel(model, validationSamples, batchSize);
         Console.WriteLine($"Perda Média de Validação: {validationLoss:F4}");
         File.AppendAllText(logPath, $"Perda Média de Validação: {validationLoss:F4}{Environment.NewLine}");
     }
 
-    private double ValidateModel(GenerativeNeuralNetworkLSTM modelToValidate, DatasetService datasetService)
+    private double ValidateModel(GenerativeNeuralNetworkLSTM modelToValidate, List<(int InputIndex, int TargetIndex)> validationSamples, int batchSize)
     {
         Console.WriteLine("\n[Validação] Iniciando...");
         double totalLoss = 0;
         int batchCount = 0;
-        datasetService.ResetValidation();
         var validationStopwatch = Stopwatch.StartNew();
-
-        while (true)
+        
+        if (validationSamples.Count == 0)
         {
-            var batch = datasetService.GetNextValidationChunk();
-            if (batch == null || batch.Count == 0) break;
+            Console.WriteLine("[AVISO] Nenhuma amostra de validação fornecida.");
+        }
+
+        for (int i = 0; i < validationSamples.Count; i += batchSize)
+        {
+            var batch = validationSamples.Skip(i).Take(batchSize).ToList();
+            if (batch.Count == 0) break;
 
             var sequenceInputIndices = batch.Select(p => p.InputIndex).ToArray();
             var sequenceTargetIndices = batch.Select(p => p.TargetIndex).ToArray();
@@ -95,7 +104,7 @@ public class ModelTrainerLSTM
             batchCount++;
             Console.Write($"\r[Validação] Processando lote de validação {batchCount}...");
             
-            modelToValidate._cacheManager.Reset();
+            modelToValidate._cacheManager?.Reset();
         }
 
         validationStopwatch.Stop();

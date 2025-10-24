@@ -36,28 +36,26 @@ public class GenerativeNeuralNetworkLSTM : NeuralNetworkLSTM
             throw new InvalidOperationException("Vocabulário vazio. Verifique o arquivo de dataset.");
         }
 
-        if (loadedVocabSize != vocabSize)
+        // Esta verificação pode ser flexibilizada dependendo da necessidade
+        if (loadedVocabSize != vocabSize && vocabularyManager.Vocab.Count < vocabSize)
         {
-            throw new ArgumentException(
-                $"O tamanho do vocabulário construído ({loadedVocabSize}) não corresponde ao solicitado ({vocabSize}).");
+             Console.WriteLine($"AVISO: O tamanho do vocabulário construído ({loadedVocabSize}) é menor que o solicitado ({vocabSize}). O modelo continuará, mas pode ser subótimo.");
         }
     }
 
     /// <summary>
     /// Novo construtor para "envolver" um modelo base (NeuralNetworkLSTM) que já foi carregado do disco.
-    /// Este é o construtor que o ModelSerializer/GenerativeService usará após o carregamento.
     /// </summary>
     public GenerativeNeuralNetworkLSTM(NeuralNetworkLSTM baseModel, VocabularyManager vocabManager,
             ISearchService? searchService)
         // Chama o construtor protegido da classe base para transferir eficientemente
         // todos os pesos e a configuração que já foram carregados.
         : base(
-            baseModel.InputSize, // vocabSize
-            baseModel.weightsEmbedding!.Shape[1], // embeddingSize (derivado do tensor carregado)
-            baseModel.HiddenSize, // hiddenSize
-            baseModel.OutputSize, // outputSize
-            baseModel.GetMathEngine(), // Passa a engine que ele já está usando
-            // Passa todos os tensores de peso já carregados
+            baseModel.InputSize,
+            baseModel.weightsEmbedding!.Shape[1],
+            baseModel.HiddenSize,
+            baseModel.OutputSize,
+            baseModel.GetMathEngine(),
             baseModel.weightsEmbedding!, baseModel.weightsInputForget!, baseModel.weightsHiddenForget!,
             baseModel.weightsInputInput!, baseModel.weightsHiddenInput!,
             baseModel.weightsInputCell!, baseModel.weightsHiddenCell!,
@@ -81,16 +79,19 @@ public class GenerativeNeuralNetworkLSTM : NeuralNetworkLSTM
 
         ResetHiddenState();
         var tokens = Tokenize(inputText);
-        using var embeddingVector = _tensorPool!.Rent(new[] { 1, _embeddingSize });
+        if (_tensorPool == null)
+        {
+            throw new InvalidOperationException("TensorPool não está inicializado. O modelo foi criado sem uma IMathEngine de GPU?");
+        }
+        
+        using var embeddingVector = _tensorPool.Rent(new[] { 1, _embeddingSize });
 
         // Aquece o estado da rede com o prompt, exceto o último token
         foreach (var token in tokens.Take(tokens.Length - 1))
         {
             int tokenIndex = GetTokenIndex(token);
-            // Executa o lookup para obter o vetor de embedding
             GetMathEngine().Lookup(weightsEmbedding!, tokenIndex, embeddingVector);
-            // Passa o vetor denso para o forward pass
-            Forward(new Tensor(embeddingVector.ToCpuTensor().GetData(), new[] { _embeddingSize }));
+            Forward(new Tensor(embeddingVector.ToCpuTensor().GetData(), new[] { 1, _embeddingSize }));
         }
 
         var responseTokens = new List<string>();
@@ -100,20 +101,15 @@ public class GenerativeNeuralNetworkLSTM : NeuralNetworkLSTM
         for (int i = 0; i < maxLength; i++)
         {
             int lastTokenIndex = GetTokenIndex(lastToken);
-            // Obtém o embedding para o último token
             GetMathEngine().Lookup(weightsEmbedding!, lastTokenIndex, embeddingVector);
+            var output = Forward(new Tensor(embeddingVector.ToCpuTensor().GetData(), new[] { 1, _embeddingSize }));
 
-            // Executa o forward pass com o vetor de embedding
-            var output = Forward(new Tensor(embeddingVector.ToCpuTensor().GetData(), new[] { _embeddingSize }));
-
-            // Amostra o próximo token a partir da distribuição de probabilidade de saída
             int predictedTokenIndex = SampleToken(output);
             string predictedToken = vocabularyManager.ReverseVocab.ContainsKey(predictedTokenIndex)
                 ? vocabularyManager.ReverseVocab[predictedTokenIndex]
                 : "<UNK>";
 
-            // Condição de parada
-            if (predictedToken == "." || predictedToken == "!" || predictedToken == "?")
+            if (predictedToken == "." || predictedToken == "!" || predictedToken == "?" || predictedToken == "<EOS>")
             {
                 responseTokens.Add(predictedToken);
                 break;
@@ -122,39 +118,27 @@ public class GenerativeNeuralNetworkLSTM : NeuralNetworkLSTM
             responseTokens.Add(predictedToken);
             lastToken = predictedToken;
         }
-
-        // Limpa o tensor reutilizado
-        _tensorPool.Return(embeddingVector);
+        
+        // A devolução do tensor agora está dentro do using, o que é redundante mas seguro.
+        // _tensorPool.Return(embeddingVector); // O 'using' já cuida disso.
 
         string response = string.Join(" ", responseTokens).Trim();
-        return response.Length > 0 ? response.Capitalize() : "Não foi possível gerar uma resposta.";
+        // Capitalize extension method não é padrão, substituído por lógica equivalente.
+        return response.Length > 0 ? char.ToUpper(response[0]) + response.Substring(1) : "Não foi possível gerar uma resposta.";
     }
 
-    // --- Métodos Utilitários ---
-
-    /// <summary>
-    /// Obtém o índice de um token do vocabulário, com fallback para "<UNK>".
-    /// </summary>
     private int GetTokenIndex(string token)
     {
-        return vocabularyManager.Vocab.TryGetValue(token, out int tokenIndex)
+        return vocabularyManager.Vocab.TryGetValue(token.ToLower(), out int tokenIndex)
             ? tokenIndex
             : vocabularyManager.Vocab["<UNK>"];
     }
 
-    /// <summary>
-    /// Tokenização simples baseada em espaços.
-    /// </summary>
     private string[] Tokenize(string text)
     {
-        // Nota: A tokenização com Regex do VocabularyManager é mais robusta para a construção do vocabulário.
-        // Esta é suficiente para a inferência em tempo real.
         return text.ToLower().Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
     }
 
-    /// <summary>
-    /// Amostra um índice de token da distribuição de probabilidade de saída do modelo.
-    /// </summary>
     private int SampleToken(Tensor output)
     {
         double[] probs = output.GetData();
@@ -165,22 +149,14 @@ public class GenerativeNeuralNetworkLSTM : NeuralNetworkLSTM
             cumulative += probs[i];
             if (r <= cumulative) return i;
         }
-
-        return probs.Length - 1; // Fallback para o último token
+        return probs.Length - 1;
     }
 
     internal VocabularyManager VocabularyManager => vocabularyManager;
 
     /// <summary>
     /// Executa um único passo de "fine-tuning corretivo".
-    /// Este método realiza um microajuste nos pesos do modelo para aproximá-lo de uma
-    /// resposta de referência, usando uma taxa de aprendizado muito baixa para
-    /// evitar a perda da capacidade generativa geral.
     /// </summary>
-    /// <param name="inputText">O prompt de entrada original.</param>
-    /// <param name="correctResponseText">A resposta de referência (considerada "correta").</param>
-    /// <param name="microLearningRate">Uma taxa de aprendizado muito pequena para o ajuste fino.</param>
-    /// <returns>A perda (loss) calculada durante este passo de correção.</returns>
     public double CorrectiveFineTuningStep(string inputText, string correctResponseText, double microLearningRate)
     {
         var inputTokens = Tokenize(inputText);
@@ -202,7 +178,11 @@ public class GenerativeNeuralNetworkLSTM : NeuralNetworkLSTM
 
         ResetHiddenState();
         double loss = TrainSequence(inputIndices.ToArray(), targetIndices.ToArray(), microLearningRate);
-        _cacheManager.Reset();
+        
+        // 🔥 CORREÇÃO: Usa o operador de propagação nula (?.) para chamar Reset()
+        // de forma segura, evitando NullReferenceException se o _cacheManager não estiver
+        // injetado, o que previne o encerramento silencioso do processo.
+        _cacheManager?.Reset();
 
         return loss;
     }

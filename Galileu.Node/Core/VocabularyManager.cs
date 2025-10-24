@@ -22,14 +22,22 @@ public class VocabularyManager
     public Dictionary<int, string> ReverseVocab => reverseVocab;
     public int VocabSize => vocab.Count;
 
-    // ====================================================================
-    // MÉTODO CORRIGIDO
-    // ====================================================================
+    /// <summary>
+    /// 🔥 CORREÇÃO DEFINITIVA: Método público que expõe a lógica de tokenização
+    /// consistente com a usada para construir o vocabulário.
+    /// </summary>
+    /// <param name="text">O texto a ser tokenizado.</param>
+    /// <returns>Um array de tokens em minúsculas.</returns>
+    public string[] Tokenize(string text)
+    {
+        // Usa a mesma Regex que BuildVocabulary para garantir consistência.
+        string pattern = @"(\p{L}+|\p{N}+|[.,!?;:'""/\-])";
+        var matches = Regex.Matches(text.ToLower(), pattern);
+        return matches.Cast<Match>().Select(m => m.Value).ToArray();
+    }
+
     public int BuildVocabulary(string datasetPath, int maxVocabSize = 20000)
     {
-        // --- LÓGICA CORRIGIDA ---
-        // 1. Tenta carregar o vocabulário primeiro.
-        // Se o arquivo existir E contiver tokens, o trabalho está feito.
         if (File.Exists(VocabFilePath))
         {
             int loadedSize = LoadVocabulary();
@@ -40,73 +48,35 @@ public class VocabularyManager
             }
         }
 
-        // 2. Se o vocabulário não pôde ser carregado (arquivo não existe ou está vazio),
-        // então prossegue para a construção a partir do dataset.
-        Console.WriteLine($"[VocabularyManager] Vocabulário não encontrado ou vazio. Construindo um novo a partir do dataset...");
-        
+        Console.WriteLine($"[VocabularyManager] Vocabulário não encontrado. Construindo um novo a partir do dataset...");
         if (!File.Exists(datasetPath))
         {
-            Console.WriteLine($"[VocabularyManager] ERRO: Arquivo de dataset não encontrado para construir vocabulário: {datasetPath}");
+            Console.WriteLine($"[VocabularyManager] ERRO: Arquivo de dataset não encontrado: {datasetPath}");
             return 0;
         }
 
         string text = File.ReadAllText(datasetPath);
-        if (string.IsNullOrWhiteSpace(text))
-        {
-            Console.WriteLine("[VocabularyManager] ERRO: Dataset vazio.");
-            return 0;
-        }
+        if (string.IsNullOrWhiteSpace(text)) return 0;
 
-        // FASE 1: Tokenização e contagem de frequências
         var tokenFrequency = new Dictionary<string, int>();
-        string pattern = @"(\p{L}+|\p{N}+|[.,!?;:'""/\-])";
-        var matches = Regex.Matches(text.ToLower(), pattern);
+        var tokens = Tokenize(text); // Agora usa o método centralizado
 
-        Console.Write("[VocabularyManager] Analisando tokens do dataset...");
-        int processedTokens = 0;
-        
-        foreach (Match match in matches)
+        foreach (string token in tokens)
         {
-            string token = match.Value;
-            
             if (tokenFrequency.ContainsKey(token))
                 tokenFrequency[token]++;
             else
                 tokenFrequency[token] = 1;
-
-            processedTokens++;
-            if (processedTokens % 100000 == 0)
-            {
-                Console.Write($"\r[VocabularyManager] Analisando tokens: {processedTokens:N0}");
-            }
         }
 
-        Console.WriteLine($"\r[VocabularyManager] Total de tokens processados: {processedTokens:N0}");
-        Console.WriteLine($"[VocabularyManager] Tokens únicos encontrados: {tokenFrequency.Count:N0}");
-
-        // FASE 2: Seleção dos tokens mais frequentes
         Vocab.Clear();
         ReverseVocab.Clear();
+        Vocab["<PAD>"] = 0; Vocab["<UNK>"] = 1;
+        ReverseVocab[0] = "<PAD>"; ReverseVocab[1] = "<UNK>";
 
-        Vocab["<PAD>"] = 0;
-        Vocab["<UNK>"] = 1;
-        ReverseVocab[0] = "<PAD>";
-        ReverseVocab[1] = "<UNK>";
-
-        var topTokens = tokenFrequency
-            .OrderByDescending(kvp => kvp.Value)
-            .Take(maxVocabSize - 2)
-            .ToList();
-
-        if (topTokens.Count == 0)
-        {
-            Console.WriteLine("[VocabularyManager] ERRO: Nenhum token válido encontrado no dataset para construir o vocabulário.");
-            return 0;
-        }
+        var topTokens = tokenFrequency.OrderByDescending(kvp => kvp.Value).Take(maxVocabSize - 2);
 
         int index = 2;
-        int minFrequency = topTokens.Last().Value;
-
         foreach (var kvp in topTokens)
         {
             Vocab[kvp.Key] = index;
@@ -114,13 +84,7 @@ public class VocabularyManager
             index++;
         }
 
-        Console.WriteLine($"[VocabularyManager] Vocabulário construído:");
-        Console.WriteLine($"  - Tamanho final: {Vocab.Count:N0} tokens");
-        Console.WriteLine($"  - Frequência mínima incluída: {minFrequency:N0}");
-        
-        // FASE 3: Salva o novo vocabulário em disco
         SaveVocabulary();
-
         return Vocab.Count;
     }
 
@@ -129,13 +93,9 @@ public class VocabularyManager
         try
         {
             var directory = Path.GetDirectoryName(VocabFilePath);
-            if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
-            {
-                Directory.CreateDirectory(directory);
-            }
+            if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory)) Directory.CreateDirectory(directory);
             var sortedVocab = Vocab.OrderBy(kvp => kvp.Value);
-            var lines = sortedVocab.Select(kvp => $"{kvp.Key}\t{kvp.Value}");
-            File.WriteAllLines(VocabFilePath, lines);
+            File.WriteAllLines(VocabFilePath, sortedVocab.Select(kvp => $"{kvp.Key}\t{kvp.Value}"));
             Console.WriteLine($"[VocabularyManager] Vocabulário salvo em: {Path.GetFileName(VocabFilePath)}");
         }
         catch (Exception ex)
@@ -146,11 +106,7 @@ public class VocabularyManager
 
     public int LoadVocabulary()
     {
-        if (!File.Exists(VocabFilePath))
-        {
-            // Não é um erro, apenas informa que não há nada para carregar.
-            return 0;
-        }
+        if (!File.Exists(VocabFilePath)) return 0;
         try
         {
             Vocab.Clear();

@@ -41,11 +41,10 @@ public class GenerativeService
     }
 
     /// <summary>
-    /// Ponto de entrada para o treinamento padrão (agora obsoleto, redireciona para o híbrido).
+    /// Ponto de entrada para o treinamento padrão (redireciona para o híbrido).
     /// </summary>
     public async Task TrainModelAsync(Trainer trainerOptions)
     {
-        // Redireciona para o fluxo de treinamento híbrido, que é o padrão agora.
         Console.WriteLine("[GenerativeService] O treinamento padrão foi invocado, redirecionando para o fluxo de Treinamento Híbrido.");
         await TrainWithTeacherAsync(trainerOptions);
     }
@@ -60,7 +59,6 @@ public class GenerativeService
             throw new FileNotFoundException($"Arquivo de dataset não encontrado em: {trainerOptions.datasetPath}");
         }
 
-        // Executa o treinamento em uma thread de background para não bloquear a API.
         await Task.Run(async () =>
         {
             const int VOCAB_SIZE = 20000;
@@ -75,6 +73,11 @@ public class GenerativeService
                     VOCAB_SIZE, EMBEDDING_SIZE, HIDDEN_SIZE,
                     trainerOptions.datasetPath, _searchService, _mathEngine
                 );
+
+                // 🔥 CORREÇÃO: Injeta explicitamente o DiskOnlyCacheManager inicial.
+                // Esta é agora a única fonte de criação de cache na inicialização do modelo.
+                initialModel._cacheManager = new DiskOnlyCacheManager(_mathEngine, EMBEDDING_SIZE, HIDDEN_SIZE);
+                
                 initialModel.RunSanityCheck();
 
                 var teacherService = new TeacherModelService(_mongoDbService);
@@ -82,30 +85,27 @@ public class GenerativeService
 
                 Console.WriteLine("\n[GenerativeService] Iniciando treinamento HÍBRIDO CONTÍNUO com professor de IA...");
 
-                // Delega toda a lógica de treinamento para o HybridTrainer.
                 await hybridTrainer.TrainModelAsync(
                     initialModel,
                     _modelPath,
                     trainerOptions.learningRate,
                     totalEpochs: trainerOptions.epochs,
-                    sftEpochs: 5, // As 5 primeiras épocas serão de destilação.
+                    sftEpochs: 5,
                     trainerOptions.batchSize,
                     trainerOptions.validationSplit
                 );
 
                 Console.WriteLine($"\n[GenerativeService] Treinamento híbrido concluído! Carregando o modelo mais recente para inferência...");
                 
-                // Carrega o modelo da última época salva pelo HybridTrainer.
                 string lastEpochModelPath = Path.Combine(Path.GetDirectoryName(_modelPath)!, $"dayson_epoch_{trainerOptions.epochs}.json");
                 if (File.Exists(lastEpochModelPath))
                 {
-                     // Copia para o caminho padrão "Dayson.json" para inferência.
                     File.Copy(lastEpochModelPath, _modelPath, overwrite: true);
                 }
 
                 InitializeFromDisk();
                 
-                initialModel = null; // A instância inicial já foi descartada pelo HybridTrainer.
+                initialModel = null;
                 ForceAggressiveGarbageCollection();
                 Console.WriteLine("[GenerativeService] Serviço pronto para inferência com o modelo final treinado.");
             }
@@ -114,8 +114,8 @@ public class GenerativeService
                 Console.ForegroundColor = ConsoleColor.Red;
                 Console.WriteLine($"\n[ERRO CRÍTICO] Falha no processo de treinamento híbrido: {ex.Message}\nStack Trace: {ex.StackTrace}");
                 Console.ResetColor();
-                initialModel?.Dispose(); // Garante a limpeza em caso de falha na inicialização.
-                throw; // Re-lança a exceção para que o chamador (API) saiba da falha.
+                initialModel?.Dispose();
+                throw;
             }
         });
     }
@@ -125,7 +125,7 @@ public class GenerativeService
     /// </summary>
     public async Task<string?> GenerateAsync(GenerateResponse generateResponse)
     {
-        if (_model == null) return "Erro: O modelo não está carregado. Treine ou carregue um modelo primeiro.";
+        if (_model == null) return "Erro: O modelo não está carregado.";
         return await Task.Run(() => _model.GenerateResponse(generateResponse.input, maxLength: 50));
     }
 
@@ -142,12 +142,13 @@ public class GenerativeService
         try
         {
             Console.WriteLine($"[GenerativeService] Carregando modelo de {_modelPath} para inferência...");
-            _model?.Dispose(); // Descarta qualquer modelo antigo em memória.
+            _model?.Dispose();
             _model = ModelSerializerLSTM.LoadModel(_modelPath, _mathEngine);
             
             if (_model != null)
             {
                 Console.WriteLine("[GenerativeService] Modelo carregado com sucesso!");
+                // O DiskOnlyCacheManager será injetado pelo HybridTrainer ou ModelTrainer, não precisa ser criado aqui.
                 if (File.Exists(Path.Combine(Environment.CurrentDirectory, "Dayson", "priming_prompt.txt")))
                 {
                     _primingService.PrimeModel(_model);

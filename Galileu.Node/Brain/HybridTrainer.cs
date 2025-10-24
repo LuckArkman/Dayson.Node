@@ -58,7 +58,7 @@ public class HybridTrainer
 
         var vocabManager = initialModel.VocabularyManager;
         var vocabulary = vocabManager.Vocab;
-        string sftCacheFilePath = Path.Combine(Environment.CurrentDirectory, "Dayson", "sft_synthetic_dataset.json");
+        string sftCacheFilePath = Path.Combine(Environment.CurrentDirectory, "Dayson", "prompt_treiner.json");
         
         List<(int InputIndex, int TargetIndex)> allSamples = new();
 

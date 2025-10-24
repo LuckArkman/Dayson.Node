@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Collections.Generic; // Necessário para List<>
 using Galileu.Node.Core;
+using Galileu.Node.Gpu;
 using Galileu.Node.Interfaces;
 using Galileu.Node.Services;
 
@@ -63,8 +64,9 @@ public class ModelTrainerLSTM
             totalEpochLoss += model.TrainSequence(sequenceInputIndices, sequenceTargetIndices, learningRate);
             batchCount++;
             Console.Write($"\r  Lotes de treinamento processados: {batchCount} de {Math.Ceiling((double)trainingSamples.Count / batchSize)}...");
-
+            if (_mathEngine.IsGpu) (_mathEngine as GpuMathEngine)?.Synchronize();
             model._cacheManager?.Reset();
+            GC.Collect();
         }
 
         _stopwatch.Stop();

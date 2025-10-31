@@ -1,0 +1,135 @@
+Usando as configurações de inicialização de /home/mplopes/Documentos/Galileu.Node/Properties/launchSettings.json...
+Compilando...
+/usr/share/dotnet/sdk/9.0.300/Sdks/Microsoft.NET.Sdk/targets/Microsoft.NET.Sdk.DefaultItems.Shared.targets(111,5): warning NETSDK1080: um PackageReference para Microsoft.AspNetCore.App não é necessário quando direcionado ao .NET Core 3.0 ou superior. Se o Microsoft.NET.Sdk.Web for usado, a estrutura compartilhada será referenciada automaticamente. Caso contrário, o PackageReference deverá ser substituído por um FrameworkReference. [/home/mplopes/Documentos/Galileu.Node/Galileu.Node.csproj]
+/home/mplopes/Documentos/Galileu.Node/Galileu.Node.csproj : warning NU1904: Package 'Akka.Remote' 1.5.27 has a known critical severity vulnerability, https://github.com/advisories/GHSA-jhpv-4q4f-43g5
+/home/mplopes/Documentos/Galileu.Node/Galileu.Node.csproj : warning NU1701: Package 'OpenCL.Net 2.2.9' was restored using '.NETFramework,Version=v4.6.1, .NETFramework,Version=v4.6.2, .NETFramework,Version=v4.7, .NETFramework,Version=v4.7.1, .NETFramework,Version=v4.7.2, .NETFramework,Version=v4.8, .NETFramework,Version=v4.8.1' instead of the project target framework 'net8.0'. This package may not be fully compatible with your project.
+/usr/share/dotnet/sdk/9.0.300/Sdks/Microsoft.NET.Sdk/targets/Microsoft.NET.Sdk.DefaultItems.Shared.targets(111,5): warning NETSDK1080: um PackageReference para Microsoft.AspNetCore.App não é necessário quando direcionado ao .NET Core 3.0 ou superior. Se o Microsoft.NET.Sdk.Web for usado, a estrutura compartilhada será referenciada automaticamente. Caso contrário, o PackageReference deverá ser substituído por um FrameworkReference. [/home/mplopes/Documentos/Galileu.Node/Galileu.Node.csproj]
+/home/mplopes/Documentos/Galileu.Node/Galileu.Node.csproj : warning NU1904: Package 'Akka.Remote' 1.5.27 has a known critical severity vulnerability, https://github.com/advisories/GHSA-jhpv-4q4f-43g5
+/home/mplopes/Documentos/Galileu.Node/Galileu.Node.csproj : warning NU1701: Package 'OpenCL.Net 2.2.9' was restored using '.NETFramework,Version=v4.6.1, .NETFramework,Version=v4.6.2, .NETFramework,Version=v4.7, .NETFramework,Version=v4.7.1, .NETFramework,Version=v4.7.2, .NETFramework,Version=v4.8, .NETFramework,Version=v4.8.1' instead of the project target framework 'net8.0'. This package may not be fully compatible with your project.
+/home/mplopes/Documentos/Galileu.Node/Brain/GenerativeNeuralNetworkLSTM.cs(71,23): warning CS0109: O membro "GenerativeNeuralNetworkLSTM.GenerateResponse(string, int)" não oculta um membro acessível. A palavra-chave new não é necessária. [/home/mplopes/Documentos/Galileu.Node/Galileu.Node.csproj]
+/home/mplopes/Documentos/Galileu.Node/Brain/NeuralNetworkLSTM.cs(1097,25): warning CS0109: O membro "NeuralNetworkLSTM.Reset()" não oculta um membro acessível. A palavra-chave new não é necessária. [/home/mplopes/Documentos/Galileu.Node/Galileu.Node.csproj]
+/home/mplopes/Documentos/Galileu.Node/Data/MongoDateConverter.cs(17,37): warning CS8600: Conversão de literal nula ou possível valor nulo em tipo não anulável. [/home/mplopes/Documentos/Galileu.Node/Galileu.Node.csproj]
+/home/mplopes/Documentos/Galileu.Node/Data/MongoDateConverter.cs(19,39): warning CS8604: Possível argumento de referência nula para o parâmetro 's' em 'DateTime DateTime.Parse(string s)'. [/home/mplopes/Documentos/Galileu.Node/Galileu.Node.csproj]
+/home/mplopes/Documentos/Galileu.Node/Brain/DiskOnlyCacheManager.cs(168,33): warning CS8625: Não é possível converter um literal nulo em um tipo de referência não anulável. [/home/mplopes/Documentos/Galileu.Node/Galileu.Node.csproj]
+/home/mplopes/Documentos/Galileu.Node/Brain/DiskOnlyCacheManager.cs(170,29): warning CS8625: Não é possível converter um literal nulo em um tipo de referência não anulável. [/home/mplopes/Documentos/Galileu.Node/Galileu.Node.csproj]
+/home/mplopes/Documentos/Galileu.Node/Services/WalletService.cs(16,12): warning CS8618: O campo não anulável '_transactions' precisa conter um valor não nulo ao sair do construtor. Considere adicionar o modificador "obrigatório" ou declarar o campo como anulável. [/home/mplopes/Documentos/Galileu.Node/Galileu.Node.csproj]
+/home/mplopes/Documentos/Galileu.Node/Services/WalletService.cs(16,12): warning CS8618: O campo não anulável '_wallets' precisa conter um valor não nulo ao sair do construtor. Considere adicionar o modificador "obrigatório" ou declarar o campo como anulável. [/home/mplopes/Documentos/Galileu.Node/Galileu.Node.csproj]
+/home/mplopes/Documentos/Galileu.Node/Services/WalletService.cs(16,12): warning CS8618: O campo não anulável '_logger' precisa conter um valor não nulo ao sair do construtor. Considere adicionar o modificador "obrigatório" ou declarar o campo como anulável. [/home/mplopes/Documentos/Galileu.Node/Galileu.Node.csproj]
+/home/mplopes/Documentos/Galileu.Node/Gpu/GpuMathEngine.cs(318,16): warning CS8600: Conversão de literal nula ou possível valor nulo em tipo não anulável. [/home/mplopes/Documentos/Galileu.Node/Galileu.Node.csproj]
+/home/mplopes/Documentos/Galileu.Node/Controllers/GenerativeController.cs(31,38): warning CS1998: Este método assíncrono não possui operadores 'await' e será executado de modo síncrono. É recomendável o uso do operador 'await' para aguardar chamadas à API desbloqueadas ou do operador 'await Task.Run(...)' para realizar um trabalho associado à CPU em um thread em segundo plano. [/home/mplopes/Documentos/Galileu.Node/Galileu.Node.csproj]
+/home/mplopes/Documentos/Galileu.Node/Gpu/GpuMathEngine.cs(367,73): warning CS8604: Possível argumento de referência nula para o parâmetro 'args' em 'void GpuMathEngine.ExecuteKernel1D(Kernel kernel, long globalSize, params object[] args)'. [/home/mplopes/Documentos/Galileu.Node/Galileu.Node.csproj]
+/home/mplopes/Documentos/Galileu.Node/Controllers/NodeController.cs(30,13): warning CS8625: Não é possível converter um literal nulo em um tipo de referência não anulável. [/home/mplopes/Documentos/Galileu.Node/Galileu.Node.csproj]
+/home/mplopes/Documentos/Galileu.Node/Gpu/GpuMathEngine.cs(465,62): warning CS8604: Possível argumento de referência nula para o parâmetro 'args' em 'void GpuMathEngine.ExecuteKernel1D(Kernel kernel, long globalSize, params object[] args)'. [/home/mplopes/Documentos/Galileu.Node/Galileu.Node.csproj]
+/home/mplopes/Documentos/Galileu.Node/Brain/ModelTrainerLSTM.cs(123,29): warning CS8602: Desreferência de uma referência possivelmente nula. [/home/mplopes/Documentos/Galileu.Node/Galileu.Node.csproj]
+/home/mplopes/Documentos/Galileu.Node/Brain/ModelTrainerLSTM.cs(137,29): warning CS8602: Desreferência de uma referência possivelmente nula. [/home/mplopes/Documentos/Galileu.Node/Galileu.Node.csproj]
+/home/mplopes/Documentos/Galileu.Node/Brain/ModelTrainerLSTM.cs(152,25): warning CS8602: Desreferência de uma referência possivelmente nula. [/home/mplopes/Documentos/Galileu.Node/Galileu.Node.csproj]
+/home/mplopes/Documentos/Galileu.Node/Brain/ModelTrainerLSTM.cs(153,25): warning CS8602: Desreferência de uma referência possivelmente nula. [/home/mplopes/Documentos/Galileu.Node/Galileu.Node.csproj]
+/home/mplopes/Documentos/Galileu.Node/Brain/ModelTrainerLSTM.cs(172,59): warning CS8604: Possível argumento de referência nula para o parâmetro 'modelToValidate' em 'double ModelTrainerLSTM.ValidateModel(GenerativeNeuralNetworkLSTM modelToValidate, DatasetService datasetService, int contextWindowSize, int batchSize, List<int> validationBatchIndices)'. [/home/mplopes/Documentos/Galileu.Node/Galileu.Node.csproj]
+/home/mplopes/Documentos/Galileu.Node/Program.cs(72,22): warning CS1998: Este método assíncrono não possui operadores 'await' e será executado de modo síncrono. É recomendável o uso do operador 'await' para aguardar chamadas à API desbloqueadas ou do operador 'await Task.Run(...)' para realizar um trabalho associado à CPU em um thread em segundo plano. [/home/mplopes/Documentos/Galileu.Node/Galileu.Node.csproj]
+/home/mplopes/Documentos/Galileu.Node/Program.cs(70,47): warning CS1998: Este método assíncrono não possui operadores 'await' e será executado de modo síncrono. É recomendável o uso do operador 'await' para aguardar chamadas à API desbloqueadas ou do operador 'await Task.Run(...)' para realizar um trabalho associado à CPU em um thread em segundo plano. [/home/mplopes/Documentos/Galileu.Node/Galileu.Node.csproj]
+/home/mplopes/Documentos/Galileu.Node/Program.cs(72,22): warning CS8321: A função local 'HandleMessage' está declarada, mas nunca é usada [/home/mplopes/Documentos/Galileu.Node/Galileu.Node.csproj]
+/home/mplopes/Documentos/Galileu.Node/Brain/ModelTrainerLSTM.cs(330,21): warning CS8602: Desreferência de uma referência possivelmente nula. [/home/mplopes/Documentos/Galileu.Node/Galileu.Node.csproj]
+/home/mplopes/Documentos/Galileu.Node/Brain/NeuralNetworkLSTM.cs(521,75): warning CS8604: Possível argumento de referência nula para o parâmetro 'targets' em '(IMathTensor predictions, float loss) NeuralNetworkLSTM.ForwardPassGpuOptimized(int[] inputIndices, IMathTensor targets, int sequenceLength)'. [/home/mplopes/Documentos/Galileu.Node/Galileu.Node.csproj]
+/home/mplopes/Documentos/Galileu.Node/Brain/NeuralNetworkLSTM.cs(917,77): warning CS8604: Possível argumento de referência nula para o parâmetro 'targets' em '(IMathTensor predictions, float loss) NeuralNetworkLSTM.ForwardPassGpuOptimized(int[] inputIndices, IMathTensor targets, int sequenceLength)'. [/home/mplopes/Documentos/Galileu.Node/Galileu.Node.csproj]
+/home/mplopes/Documentos/Galileu.Node/Services/WalletService.cs(12,60): warning CS0649: Campo "WalletService._transactions" nunca é atribuído e sempre terá seu valor padrão null [/home/mplopes/Documentos/Galileu.Node/Galileu.Node.csproj]
+/home/mplopes/Documentos/Galileu.Node/Services/WalletService.cs(13,55): warning CS0649: Campo "WalletService._wallets" nunca é atribuído e sempre terá seu valor padrão null [/home/mplopes/Documentos/Galileu.Node/Galileu.Node.csproj]
+/home/mplopes/Documentos/Galileu.Node/Services/WalletService.cs(14,45): warning CS0649: Campo "WalletService._logger" nunca é atribuído e sempre terá seu valor padrão null [/home/mplopes/Documentos/Galileu.Node/Galileu.Node.csproj]
+/home/mplopes/Documentos/Galileu.Node/Services/DatasetService.cs(14,21): warning CS0414: O campo "DatasetService._validationIndex" é atribuído, mas seu valor nunca é usado [/home/mplopes/Documentos/Galileu.Node/Galileu.Node.csproj]
+/home/mplopes/Documentos/Galileu.Node/Services/DatasetService.cs(13,21): warning CS0414: O campo "DatasetService._trainIndex" é atribuído, mas seu valor nunca é usado [/home/mplopes/Documentos/Galileu.Node/Galileu.Node.csproj]
+ === Swagger Acess http://localhost:38169/swagger/index.html ===
+info: Services.GossipService[0]
+      Gossip Service iniciado. Fofocando a cada 15 segundos.
+[INFO][10/27/2025 17:45:48.509Z][Thread 0001][remoting (akka://Dyson-System)] Starting remoting
+[INFO][10/27/2025 17:45:48.663Z][Thread 0001][remoting (akka://Dyson-System)] Remoting started; listening on addresses : [akka.tcp://Dyson-System@localhost:48169]
+[INFO][10/27/2025 17:45:48.664Z][Thread 0001][remoting (akka://Dyson-System)] Remoting now listens on addresses: [akka.tcp://Dyson-System@localhost:48169]
+[Akka] Sistema de Atores iniciado em akka.tcp://Dyson-System@localhost:48169
+info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: http://localhost:38169
+info: Microsoft.Hosting.Lifetime[0]
+      Application started. Press Ctrl+C to shut down.
+info: Microsoft.Hosting.Lifetime[0]
+      Hosting environment: Development
+info: Microsoft.Hosting.Lifetime[0]
+      Content root path: /home/mplopes/Documentos/Galileu.Node
+[Registry] Nó specialized-node-3d8f649d em http://localhost:38169 registrado.
+Iniciando registro com o Orquestrador em http://localhost:5001...
+ERRO CRÍTICO no registro: Connection refused (localhost:5001). O nó não pode se juntar à rede e permanecerá em modo de espera.
+[OpenCL] Usando dispositivo: gfx803
+[GenerativeService] Usando GpuMathEngine para aceleração.
+Arquivo de dataset existe >> True
+
+========================================
+CONFIGURAÇÃO DE TREINAMENTO OTIMIZADA
+MODO: LONGO PRAZO (100 ÉPOCAS / 20 DIAS)
+========================================
+[VocabularyManager] Vocabulário carregado: 20000 tokens
+[VocabularyManager] Carregando vocabulario in Disco (máx: 20000 tokens)...
+
+[Config] Vocabulário: 20000 tokens
+[Config] Hidden Size: 256
+[Config] Embedding Size: 128
+[Config] Épocas: 25
+[Config] Learning Rate: 0,002
+[Config] Batch Size: 16 (otimizado para memória)
+[Config] Validação: 10%
+[Config] META: RAM < 10GB durante 20 dias
+
+========================================
+INICIANDO TREINAMENTO
+Duração estimada: 20 dias
+Monitoramento de memória: ATIVO
+========================================
+
+[GenerativeService] Arquitetura: Vocab=20000, Emb=96, Hidden=192
+[VocabularyManager] Vocabulário carregado: 20000 tokens
+[VocabularyManager] Carregando vocabulario in Disco (máx: 20000 tokens)...
+
+════════════════════════════════════════════════════════════════════════════════
+EXECUTANDO VALIDAÇÃO DE INTEGRIDADE DO MODELO
+════════════════════════════════════════════════════════════════════════════════
+[SanityCheck] Modelo verificado com sucesso.
+════════════════════════════════════════════════════════════════════════════════
+
+[GenerativeService] Memória estimada do modelo: ~137MB
+
+[GenerativeService] Iniciando treinamento com otimizações de memória...
+TrainModel >> /home/mplopes/Documentos/Galileu.Node/Dayson/pt_0.txt
+[DatasetService] Diretório de lotes criado: /home/mplopes/Documentos/Galileu.Node/Dayson/batches
+[Trainer] Memória antes da inicialização do dataset: 433 MB
+[DatasetService] Inicializando dataset com contextWindowSize=6, vocabSize=20000, batchSize=16, validationSplit=0,1
+[DatasetService] Memória antes da inicialização: 17 MB
+[DatasetService] Geradas 810364 sequências de tamanho 5
+[DatasetService] Dados de treino: 45583 lotes, Dados de validação: 5065 lotes, Tamanho do lote: 16
+[Trainer] Memória após inicialização do dataset: 525 MB (Delta: 92 MB)
+
+[Trainer] Configuração do Ciclo de Treinamento com Liberação Total de Memória:
+  - Estratégia: Salvar → Descartar TUDO → GC Agressivo → Recarregar
+  - Objetivo: 100% de liberação de memória garantida entre épocas.
+
+
+                                                           ═
+ÉPOCA 1/25 >> Learning Rate : 0,002 >> 27/10/2025 17:51:09
+                                                           ═
+[DatasetService] Resetando índice de treino
+
+Época: 1/25 | Lotes: 1 ...[Trainer] Memória após lote 0: 413 MB (Delta: -112 MB)
+Época: 1/25 | Lotes: 2 ...[Trainer] Memória após lote 1: 417 MB (Delta: 4 MB)
+Época: 1/25 | Lotes: 3 ...[Trainer] Memória após lote 2: 420 MB (Delta: 3 MB)
+Época: 1/25 | Lotes: 4 ...[Trainer] Memória após lote 3: 423 MB (Delta: 3 MB)
+Época: 1/25 | Lotes: 5 ...[Trainer] Memória após lote 4: 426 MB (Delta: 3 MB)
+Época: 1/25 | Lotes: 6 ...[Trainer] Memória após lote 5: 429 MB (Delta: 3 MB)
+Época: 1/25 | Lotes: 7 ...[Trainer] Memória após lote 6: 432 MB (Delta: 3 MB)
+Época: 1/25 | Lotes: 8 ...[Trainer] Memória após lote 7: 434 MB (Delta: 2 MB)
+Época: 1/25 | Lotes: 9 ...[Trainer] Memória após lote 8: 437 MB (Delta: 3 MB)
+Época: 1/25 | Lotes: 10 ...[Trainer] Memória após lote 9: 440 MB (Delta: 3 MB)
+Época: 1/25 | Lotes: 11 ...[Trainer] Memória após lote 10: 428 MB (Delta: -12 MB)
+Época: 1/25 | Lotes: 12 ...[Trainer] Memória após lote 11: 446 MB (Delta: 18 MB)
+Época: 1/25 | Lotes: 13 ...[Trainer] Memória após lote 12: 449 MB (Delta: 3 MB)
+Época: 1/25 | Lotes: 14 ...[Trainer] Memória após lote 13: 452 MB (Delta: 3 MB)
+Época: 1/25 | Lotes: 15 ...[Trainer] Memória após lote 14: 454 MB (Delta: 2 MB)
+Época: 1/25 | Lotes: 16 ...[Trainer] Memória após lote 15: 457 MB (Delta: 3 MB)
+Época: 1/25 | Lotes: 17 ...[Trainer] Memória após lote 16: 460 MB (Delta: 3 MB)
+Época: 1/25 | Lotes: 18 ...[Trainer] Memória após lote 17: 463 MB (Delta: 3 MB)
+Época: 1/25 | Lotes: 19 ...[Trainer] Memória após lote 18: 451 MB (Delta: -12 MB)
+Época: 1/25 | Lotes: 20 ...[Trainer] Memória após lote 19: 468 MB (Delta: 17 MB)
+Época: 1/25 | Lotes: 21 ...[Trainer] Memória após lote 20: 457 MB (Delta: -11 MB)

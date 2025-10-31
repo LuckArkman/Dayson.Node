@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "dgSpecHash": "YdkuB1d7jsM=",
+  "success": true,
+  "projectFilePath": "/home/mplopes/Documentos/Dayson.Node/Solution/Models/Models.csproj",
+  "expectedPackageFiles": [
+    "/home/mplopes/.nuget/packages/microsoft.aspnetcore.app.ref/8.0.16/microsoft.aspnetcore.app.ref.8.0.16.nupkg.sha512"
+  ],
+  "logs": []
+}

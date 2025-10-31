@@ -65,6 +65,8 @@ public class ModelTrainerLSTM
             batchCount++;
             Console.Write($"\r  Lotes de treinamento processados: {batchCount} de {Math.Ceiling((double)trainingSamples.Count / batchSize)}...");
             
+            if (_mathEngine.IsGpu)(_mathEngine as GpuMathEngine)?.Synchronize();
+            
             model._cacheManager?.Reset();
         }
 

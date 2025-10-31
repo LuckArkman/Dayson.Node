@@ -141,7 +141,7 @@ public class TensorPool : IDisposable
         GC.Collect(2, GCCollectionMode.Forced, true, true);
         GC.WaitForPendingFinalizers();
         
-        //Console.WriteLine($"[TensorPool] Trim concluído: {GetTotalMemoryUsageMB()}MB");
+        Console.WriteLine($"[TensorPool] Trim concluído: {GetTotalMemoryUsageMB()}MB");
     }
 
     /// <summary>

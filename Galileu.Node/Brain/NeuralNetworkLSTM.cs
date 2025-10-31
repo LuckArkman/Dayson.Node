@@ -360,82 +360,117 @@ public class NeuralNetworkLSTM : IDisposable
     private (IMathTensor predictions, double loss) ForwardPassGpuOptimized(int[] inputIndices, IMathTensor targets, int sequenceLength)
     {
         var predictions = _mathEngine.CreateTensor(new[] { sequenceLength, outputSize });
+        
+        // Estes não são do pool, então `using` está correto.
         using var h_prev = _mathEngine.CreateTensor(new[] { 1, hiddenSize });
         using var c_prev = _mathEngine.CreateTensor(new[] { 1, hiddenSize });
 
         int embeddingSize = weightsEmbedding!.Shape[1];
-        using var linearBuffer = _tensorPool!.Rent(new[] { 1, hiddenSize });
-        using var temp1 = _tensorPool.Rent(new[] { 1, hiddenSize });
-        using var temp2 = _tensorPool.Rent(new[] { 1, hiddenSize });
-        using var outputLinear = _tensorPool.Rent(new[] { 1, outputSize });
-        using var outputSoftmax = _tensorPool.Rent(new[] { 1, outputSize });
 
-        for (int t = 0; t < sequenceLength; t++)
+        // 🔥 CORREÇÃO: Aluga os buffers temporários fora do loop, SEM `using`.
+        IMathTensor? linearBuffer = null, temp1 = null, temp2 = null, outputLinear = null, outputSoftmax = null;
+
+        try
         {
-            using var inputEmbedding = _tensorPool.Rent(new[] { 1, embeddingSize });
-            _mathEngine.Lookup(weightsEmbedding!, inputIndices[t], inputEmbedding);
+            linearBuffer = _tensorPool!.Rent(new[] { 1, hiddenSize });
+            temp1 = _tensorPool.Rent(new[] { 1, hiddenSize });
+            temp2 = _tensorPool.Rent(new[] { 1, hiddenSize });
+            outputLinear = _tensorPool.Rent(new[] { 1, outputSize });
+            outputSoftmax = _tensorPool.Rent(new[] { 1, outputSize });
 
-            using var forgetGate = _tensorPool.Rent(new[] { 1, hiddenSize });
-            _mathEngine.MatrixMultiply(inputEmbedding, weightsInputForget!, temp1);
-            _mathEngine.MatrixMultiply(h_prev, weightsHiddenForget!, temp2);
-            _mathEngine.Add(temp1, temp2, linearBuffer);
-            _mathEngine.AddBroadcast(linearBuffer, biasForget!, linearBuffer);
-            _mathEngine.Sigmoid(linearBuffer, forgetGate);
-
-            using var inputGate = _tensorPool.Rent(new[] { 1, hiddenSize });
-            _mathEngine.MatrixMultiply(inputEmbedding, weightsInputInput!, temp1);
-            _mathEngine.MatrixMultiply(h_prev, weightsHiddenInput!, temp2);
-            _mathEngine.Add(temp1, temp2, linearBuffer);
-            _mathEngine.AddBroadcast(linearBuffer, biasInput!, linearBuffer);
-            _mathEngine.Sigmoid(linearBuffer, inputGate);
-
-            using var cellCandidate = _tensorPool.Rent(new[] { 1, hiddenSize });
-            _mathEngine.MatrixMultiply(inputEmbedding, weightsInputCell!, temp1);
-            _mathEngine.MatrixMultiply(h_prev, weightsHiddenCell!, temp2);
-            _mathEngine.Add(temp1, temp2, linearBuffer);
-            _mathEngine.AddBroadcast(linearBuffer, biasCell!, linearBuffer);
-            _mathEngine.Tanh(linearBuffer, cellCandidate);
-
-            using var cellNext = _tensorPool.Rent(new[] { 1, hiddenSize });
-            _mathEngine.Multiply(forgetGate, c_prev, temp1);
-            _mathEngine.Multiply(inputGate, cellCandidate, temp2);
-            _mathEngine.Add(temp1, temp2, cellNext);
-
-            using var outputGate = _tensorPool.Rent(new[] { 1, hiddenSize });
-            _mathEngine.MatrixMultiply(inputEmbedding, weightsInputOutput!, temp1);
-            _mathEngine.MatrixMultiply(h_prev, weightsHiddenOutput!, temp2);
-            _mathEngine.Add(temp1, temp2, linearBuffer);
-            _mathEngine.AddBroadcast(linearBuffer, biasOutput!, linearBuffer);
-            _mathEngine.Sigmoid(linearBuffer, outputGate);
-
-            using var tanhCellNext = _tensorPool.Rent(new[] { 1, hiddenSize });
-            _mathEngine.Tanh(cellNext, tanhCellNext);
-            using var hiddenNext = _tensorPool.Rent(new[] { 1, hiddenSize });
-            _mathEngine.Multiply(outputGate, tanhCellNext, hiddenNext);
-
-            const double MAX_ACTIVATION_VALUE = 5.0;
-            _mathEngine.Clip(hiddenNext, -MAX_ACTIVATION_VALUE, MAX_ACTIVATION_VALUE);
-            _mathEngine.Clip(cellNext, -MAX_ACTIVATION_VALUE, MAX_ACTIVATION_VALUE);
-
-            var stepCache = new LstmStepCache
+            for (int t = 0; t < sequenceLength; t++)
             {
-                Input = _mathEngine.Clone(inputEmbedding), HiddenPrev = _mathEngine.Clone(h_prev),
-                CellPrev = _mathEngine.Clone(c_prev), ForgetGate = _mathEngine.Clone(forgetGate),
-                InputGate = _mathEngine.Clone(inputGate), CellCandidate = _mathEngine.Clone(cellCandidate),
-                OutputGate = _mathEngine.Clone(outputGate), CellNext = _mathEngine.Clone(cellNext),
-                TanhCellNext = _mathEngine.Clone(tanhCellNext), HiddenNext = _mathEngine.Clone(hiddenNext)
-            };
-            _cacheManager!.CacheStep(stepCache);
+                // 🔥 CORREÇÃO: Tensores alugados dentro do loop, SEM `using`.
+                IMathTensor? inputEmbedding = null, forgetGate = null, inputGate = null, cellCandidate = null,
+                             cellNext = null, outputGate = null, tanhCellNext = null, hiddenNext = null;
+                try
+                {
+                    inputEmbedding = _tensorPool.Rent(new[] { 1, embeddingSize });
+                    forgetGate = _tensorPool.Rent(new[] { 1, hiddenSize });
+                    inputGate = _tensorPool.Rent(new[] { 1, hiddenSize });
+                    cellCandidate = _tensorPool.Rent(new[] { 1, hiddenSize });
+                    cellNext = _tensorPool.Rent(new[] { 1, hiddenSize });
+                    outputGate = _tensorPool.Rent(new[] { 1, hiddenSize });
+                    tanhCellNext = _tensorPool.Rent(new[] { 1, hiddenSize });
+                    hiddenNext = _tensorPool.Rent(new[] { 1, hiddenSize });
 
-            _mathEngine.MatrixMultiply(hiddenNext, weightsHiddenOutputFinal!, outputLinear);
-            _mathEngine.AddBroadcast(outputLinear, biasOutputFinal!, outputLinear);
-            _mathEngine.Softmax(outputLinear, outputSoftmax);
-            _mathEngine.Set(predictions, t, outputSoftmax);
+                    // ... (Toda a lógica matemática do forward pass permanece a mesma) ...
+                    
+                    _mathEngine.Lookup(weightsEmbedding!, inputIndices[t], inputEmbedding);
+                    _mathEngine.MatrixMultiply(inputEmbedding, weightsInputForget!, temp1);
+                    _mathEngine.MatrixMultiply(h_prev, weightsHiddenForget!, temp2);
+                    _mathEngine.Add(temp1, temp2, linearBuffer);
+                    _mathEngine.AddBroadcast(linearBuffer, biasForget!, linearBuffer);
+                    _mathEngine.Sigmoid(linearBuffer, forgetGate);
+                    // ... (inputGate, cellCandidate)
+                    _mathEngine.MatrixMultiply(inputEmbedding, weightsInputInput!, temp1);
+                    _mathEngine.MatrixMultiply(h_prev, weightsHiddenInput!, temp2);
+                    _mathEngine.Add(temp1, temp2, linearBuffer);
+                    _mathEngine.AddBroadcast(linearBuffer, biasInput!, linearBuffer);
+                    _mathEngine.Sigmoid(linearBuffer, inputGate);
+                    _mathEngine.MatrixMultiply(inputEmbedding, weightsInputCell!, temp1);
+                    _mathEngine.MatrixMultiply(h_prev, weightsHiddenCell!, temp2);
+                    _mathEngine.Add(temp1, temp2, linearBuffer);
+                    _mathEngine.AddBroadcast(linearBuffer, biasCell!, linearBuffer);
+                    _mathEngine.Tanh(linearBuffer, cellCandidate);
+                    // ... (cellNext, outputGate, tanhCellNext, hiddenNext)
+                    _mathEngine.Multiply(forgetGate, c_prev, temp1);
+                    _mathEngine.Multiply(inputGate, cellCandidate, temp2);
+                    _mathEngine.Add(temp1, temp2, cellNext);
+                    _mathEngine.MatrixMultiply(inputEmbedding, weightsInputOutput!, temp1);
+                    _mathEngine.MatrixMultiply(h_prev, weightsHiddenOutput!, temp2);
+                    _mathEngine.Add(temp1, temp2, linearBuffer);
+                    _mathEngine.AddBroadcast(linearBuffer, biasOutput!, linearBuffer);
+                    _mathEngine.Sigmoid(linearBuffer, outputGate);
+                    _mathEngine.Tanh(cellNext, tanhCellNext);
+                    _mathEngine.Multiply(outputGate, tanhCellNext, hiddenNext);
 
-            _mathEngine.Multiply(h_prev, _mathEngine.CreateTensor(new double[h_prev.Length], h_prev.Shape), h_prev); // Workaround
-            _mathEngine.Add(h_prev, hiddenNext, h_prev);
-            _mathEngine.Multiply(c_prev, _mathEngine.CreateTensor(new double[c_prev.Length], c_prev.Shape), c_prev); // Workaround
-            _mathEngine.Add(c_prev, cellNext, c_prev);
+                    const double MAX_ACTIVATION_VALUE = 5.0;
+                    _mathEngine.Clip(hiddenNext, -MAX_ACTIVATION_VALUE, MAX_ACTIVATION_VALUE);
+                    _mathEngine.Clip(cellNext, -MAX_ACTIVATION_VALUE, MAX_ACTIVATION_VALUE);
+
+                    var stepCache = new LstmStepCache
+                    {
+                        Input = _mathEngine.Clone(inputEmbedding), HiddenPrev = _mathEngine.Clone(h_prev),
+                        CellPrev = _mathEngine.Clone(c_prev), ForgetGate = _mathEngine.Clone(forgetGate),
+                        InputGate = _mathEngine.Clone(inputGate), CellCandidate = _mathEngine.Clone(cellCandidate),
+                        OutputGate = _mathEngine.Clone(outputGate), CellNext = _mathEngine.Clone(cellNext),
+                        TanhCellNext = _mathEngine.Clone(tanhCellNext), HiddenNext = _mathEngine.Clone(hiddenNext)
+                    };
+                    _cacheManager!.CacheStep(stepCache);
+
+                    _mathEngine.MatrixMultiply(hiddenNext, weightsHiddenOutputFinal!, outputLinear);
+                    _mathEngine.AddBroadcast(outputLinear, biasOutputFinal!, outputLinear);
+                    _mathEngine.Softmax(outputLinear, outputSoftmax);
+                    _mathEngine.Set(predictions, t, outputSoftmax);
+
+                    // A atualização de h_prev e c_prev precisa ser uma cópia, não uma adição.
+                    // O `Clone` é a maneira correta de fazer isso.
+                    h_prev.UpdateFromCpu(hiddenNext.ToCpuTensor().GetData());
+                    c_prev.UpdateFromCpu(cellNext.ToCpuTensor().GetData());
+                }
+                finally
+                {
+                    // 🔥 CORREÇÃO: Devolve os tensores ao pool no final de cada iteração.
+                    if (inputEmbedding != null) _tensorPool.Return(inputEmbedding);
+                    if (forgetGate != null) _tensorPool.Return(forgetGate);
+                    if (inputGate != null) _tensorPool.Return(inputGate);
+                    if (cellCandidate != null) _tensorPool.Return(cellCandidate);
+                    if (cellNext != null) _tensorPool.Return(cellNext);
+                    if (outputGate != null) _tensorPool.Return(outputGate);
+                    if (tanhCellNext != null) _tensorPool.Return(tanhCellNext);
+                    if (hiddenNext != null) _tensorPool.Return(hiddenNext);
+                }
+            }
+        }
+        finally
+        {
+            // 🔥 CORREÇÃO: Devolve os buffers temporários ao pool no final do método.
+            if (linearBuffer != null) _tensorPool.Return(linearBuffer);
+            if (temp1 != null) _tensorPool.Return(temp1);
+            if (temp2 != null) _tensorPool.Return(temp2);
+            if (outputLinear != null) _tensorPool.Return(outputLinear);
+            if (outputSoftmax != null) _tensorPool.Return(outputSoftmax);
         }
 
         double sequenceLoss = CalculateCrossEntropyLoss(predictions, targets);
